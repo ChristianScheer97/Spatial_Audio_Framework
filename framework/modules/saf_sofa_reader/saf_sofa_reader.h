@@ -82,6 +82,8 @@ typedef enum{
  * specifications:
  *    https://www.sofaconventions.org/mediawiki/index.php/GeneralFIR
  *    https://www.sofaconventions.org/mediawiki/index.php/SimpleFreeFieldHRIR
+ *    https://www.sofaconventions.org/mediawiki/index.php/MultiSpeakerBRIR
+ *    https://www.sofaconventions.org/mediawiki/index.php/SingleRoomMIMOSRIR
  */
 typedef struct _saf_sofa_container{
     /* All possible SOFA variables (defaults={-1|NULL}) */
@@ -134,8 +136,11 @@ typedef struct _saf_sofa_container{
     /* All possible SOFA global attributes (defaults=NULL) */
     char* Conventions;            /**< {'SOFA'} */
     char* Version;                /**< Version number */
-    char* SOFAConventions;        /**< {'GeneralFIR'|'GeneralTF'|
-                                   *   'SimpleFreeFieldHRIR'} */
+    char* SOFAConventions;        /**< {'GeneralFIR'|
+                                        'GeneralTF'|
+                                   *    'SimpleFreeFieldHRIR'|
+                                        'SingleRoomMIMOSRIR'|
+                                        'MultiSpeakerBRIR'} */
     char* SOFAConventionsVersion; /**< SOFA convention number */
     char* APIName;                /**< API name */
     char* APIVersion;             /**< API version */
@@ -203,6 +208,8 @@ typedef enum{
  *          Engineering Society.
  * @see [2] https://www.sofaconventions.org/mediawiki/index.php/GeneralFIR
  * @see [3] https://www.sofaconventions.org/mediawiki/index.php/SimpleFreeFieldHRIR
+ * @see [4] https://www.sofaconventions.org/mediawiki/index.php/SingleRoomMIMOSRIR
+ * @see [5] https://www.sofaconventions.org/mediawiki/index.php/MultiSpeakerBRIR
  */
 SAF_SOFA_ERROR_CODES saf_sofa_open(saf_sofa_container* hSOFA,
                                    char* sofa_filepath,
