@@ -78,8 +78,8 @@ typedef enum{
 
 /**
  * SOFA container struct comprising all possible data that can be extracted
- * from SOFA 1.0 files; as laid down in the GeneralFIR and SimpleFreeFieldHRIR
- * specifications:
+ * from SOFA 1.0 and 2.1 files; as laid down in the GeneralFIR, SimpleFreeFieldHRIR, 
+ * MultiSpeakerBRIR and SingleRoomMIMOSRIR specifications:
  *    https://www.sofaconventions.org/mediawiki/index.php/GeneralFIR
  *    https://www.sofaconventions.org/mediawiki/index.php/SimpleFreeFieldHRIR
  *    https://www.sofaconventions.org/mediawiki/index.php/MultiSpeakerBRIR
@@ -91,7 +91,7 @@ typedef struct _saf_sofa_container{
     int nReceivers;               /**< Number of ears/number of mics etc. */
     int DataLengthIR;             /**< Length of the IRs, in samples */
     float* DataIR;                /**< The impulse response (IR) Data;
-                                   * FLAT:nSources x nReceivers x DataLengthIR*/
+                                   *   FLAT:nSources x nReceivers x DataLengthIR*/
     float DataSamplingRate;       /**< Sampling rate used to measure the IRs */
     float* DataDelay;             /**< Delay in samples; nReceivers x 1 */
     float* SourcePosition;        /**< Source positions (refer to
@@ -118,19 +118,65 @@ typedef struct _saf_sofa_container{
                                    *   the measurement (refer to
                                    *   EmitterPositionType &
                                    *   EmitterPositionUnits for the convention
-                                   *   and units); FLAT: nEmitters x 3 */
+                                   *   and units); FLAT: nEmitters x 3  or nEmitters x 3 x mMeasurements*/
+    float* EmitterUp;             /**< Vector pointing upwards from the emitter
+                                   *   position (Cartesian); [E C I] or [E C M]; nEmitters x3 or nEmitter x 3 x mMeasurements */ 
+    float* EmitterView;           /**< Vector pointing forwards from the
+                                   *   emitter position (Cartesian) [E C I] or [E C M]; nEmitters x3 or nEmitter x 3 x mMeasurements  */
+    float* RoomTemperature;       /**< Temperature during measurements, given in Kelvin (if not differently set in RoomTemperatureUnits). [I] or [M]
+                                   *   1 x 1 or FLAT: mMeasurements x 1 */
+    float* RoomVolume;            /**< Volume of the room [I] or [M I]
+                                   *   1 x 1 or FLAT: mMeasurements x 1 */
+    float* RoomCornerA;           /**< Cartesian yxordinate of edge A [I C] or [M C]
+                                   *   1 x 3 or FLAT: mMeasurements x 3*/
+    float* RoomCornerB;           /**< Cartesian yxordinate of edge B [I C] or [M C]
+                                   *   1 x 3 or FLAT: mMeasurements x 3*/
+    int RoomCorners;              /**< The value of this attribute is to be ignored. It only exist to for RoomCorners:Type and RoomCorners:Units  [II]*/
+    float* ReceiverView;          /**< View vector for the orientation. [R C I] or [R C M]
+                                   *   rReceivers x 3  or  rReceivers x 3 x rMeasurements */
+    float* ReceiverUp;            /**< Up vector for the orientation. [R C I] or [R C M] 
+                                   *   rReceivers x 3 x 1 or rReceivers x 3 x mMeasurements */
+    float* SourceView;            /**< Vector pointing forwards from the
+                                   *   source position (Cartesian) [I C] or [M C]; 3 x 1 or 3  */
+    float* SourceUp;              /**< /**< Vector pointing upwards from the listener [I C] or [M C]
+                                   *   position (Cartesian); 1 x 3 or FLAT: mMeasurements x 3  */ 
+    
+    int* MeasurementDate;         /**< Optional M-dependent date and time of the measurement. 
+                                   *   8 or 8 * mMeasurements */
 
-    /* All possible SOFA variable attributes (defaults=NULL) */
+
+    /* All possible SOFA strings (defaults=NULL) */
+    char* EmitterDescriptions;    /**< E-dependent version of the attribute EmitterDescription. [E S] or [E S M]
+                                   *   When more than one string is considered in a file, S shall represent the size of the character array with the longest string dimension.
+                                   *   Entries shorter than S shall be padded with null characters up to the length of S.
+                                       eEmitters x sCharacters or eEmitters x sCharacters x mMEasurements */
+    char* ReceiverDescriptions;   /**< R-dependent version of the attribute ReceiverDescription. [R S] or [R S M]
+                                   *   When more than one string is considered in a file, S shall represent the size of the character array with the longest string dimension.
+                                   *   Entries shorter than S shall be padded with null characters up to the length of S.
+                                   *   rReceivers x sCharacters or sReceivers x sCharacters x mMeasurements */
+    
+                                   
+                                   /* All possible SOFA variable attributes (defaults=NULL) */
     char* ListenerPositionType;   /**< {'cartesian'|'spherical'} */
     char* ListenerPositionUnits;  /**< {'degree, degree, metre'|'metre'} */
     char* ListenerViewType;       /**< {'cartesian'|'spherical'} */
     char* ListenerViewUnits;      /**< {'degree, degree, metre'|'metre'} */
     char* ReceiverPositionType;   /**< {'cartesian'|'spherical'} */
     char* ReceiverPositionUnits;  /**< {'degree, degree, metre'|'metre'} */
+    char* ReceriverViewType;      /**< {'cartesian'} */
+    char* ReceriverViewUnits;     /**< {'metre'} */
+    char* RoomCornersType;        /**< {'cartesian'} */
+    char* RoomCornersUnits;       /**< {'metre'} */
+    char* RoomTemperaturUnits;    /**< {'kelvin' | 'celsius' | 'fahrenheit'} */
+    char* RoomVolumeUnits;        /**< {'cubic metre' */
     char* SourcePositionType;     /**< {'cartesian'|'spherical'} */
     char* SourcePositionUnits;    /**< {'degree, degree, metre'|'metre'} */
+    char* SourceViewType;         /**< {'cartesian'} */
+    char* SourceViewUnits;        /**< {'metre'} */
     char* EmitterPositionType;    /**< {'cartesian'|'spherical'} */
     char* EmitterPositionUnits;   /**< {'degree, degree, metre'|'metre'} */
+    char* EmitterViewType;        /**< {'cartesian'} */
+    char* EmitterViewUnits;        /**< {'metre'} */
     char* DataSamplingRateUnits;  /**< {'hertz'} */
 
     /* All possible SOFA global attributes (defaults=NULL) */
@@ -148,18 +194,30 @@ typedef struct _saf_sofa_container{
     char* ApplicationVersion;     /**< Ver. of Application that created file */
     char* AuthorContact;          /**< Contact information */
     char* Comment;                /**< File comments */
-    char* DataType;               /**< {'FIR'|'TF'} */
+    char* DataType;               /**< {'FIR'|'TF'|'FIR-E'} */
     char* History;                /**< History information */
     char* License;                /**< License under which file is provided */
     char* Organisation;           /**< Organisation reponsible for the file */
     char* References;             /**< References */
-    char* RoomType;               /**< Room type (free field etc.) */
+    char* RoomDescription;        /**< Informal verbal description of the room */
+    char* RoomGeometry;           /**< URI to a file describing the room geometry */
+    char* RoomLocation;           /**< Location of the room */
+    char* RoomShortName;          /**< Short name of the Room */
+    char* RoomType;               /**< Room type (free field, shoebox, dae etc.) */
     char* Origin;                 /**< Where this file came from */
+    char* Organization;           /**< Organization that provided the data */
     char* DateCreated;            /**< Date file was created */
     char* DateModified;           /**< Date file was modified */
     char* Title;                  /**< Title of file */
-    char* DatabaseName;           /**< Name of database this file belongs to */
+    char* DatabaseName;           /**< Name of the database. Used for classification of the data. */
     char* ListenerShortName;      /**< Name of the listener/dummyhead/mic etc.*/
+    char* ListenerDescription;    /**< Description of the listener */
+    char* ReceiverShortName;      /**< Short name of the receiver */
+    char* ReceiverDescription;    /**< Description of the receiver */
+    char* SourceShortName;        /**< Short name of the source */
+    char* SourceDescription;      /**< Description of the source */
+    char* EmitterShortName;       /**< Short name of the emitter */
+    char* EmitterDescription;     /**< Description of the emitter */
 
     /* libmysofa handle, which is used if SAF_ENABLE_NETCDF is not defined */
     void* hLMSOFA;                /**< libmysofa handle */
@@ -187,8 +245,9 @@ typedef enum{
 /* ========================================================================== */
 
 /**
- * Fills a 'sofa_container' with data found in a SOFA file (GeneralFIR or
- * SimpleFreeFieldHRIR), as detailed in the SOFA 1.0 standard [1,2,3]
+ * Fills a 'sofa_container' with data found in a SOFA file (GeneralFIR,
+ * SimpleFreeFieldHRIR, SingleRoomMIMOSRIR or MultiSpeakerBRIR), as detailed 
+ * in the SOFA 1.0 and 2.1 standard [1,2,3,4,5]
  *
  * @warning This loader currently does not support TF SOFA files!
  * @note If you encounter a SOFA file that this SOFA loader cannot load, (or it

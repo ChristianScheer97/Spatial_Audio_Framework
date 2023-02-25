@@ -68,22 +68,35 @@ SAF_SOFA_ERROR_CODES saf_sofa_open
     h->nSources = h->nReceivers = h->DataLengthIR = -1;
     h->DataSamplingRate = 0.0f;
     h->nEmitters = h->nListeners = -1;
+
     h->DataIR = h->SourcePosition = h->ReceiverPosition = h->ListenerPosition =
-    h->ListenerUp = h->ListenerView = h->EmitterPosition = NULL;
-    h->DataDelay = NULL;
+    h->ListenerUp = h->ListenerView = h->EmitterPosition = h->DataDelay =
+    h->MeasurementDate = h->SourceUp = h->SourceView = h->ReceiverUp =
+    h->ReceiverView = h->RoomCorners = h->RoomCornerB = h->RoomCornerA =
+    h->RoomVolume = h->RoomTemperature = h->EmitterView = h->EmitterUp = NULL;
+
+    /* Default strings */
+    h->EmitterDescriptions = h->ReceiverDescriptions = NULL;
 
     /* Default variable attributes */
     h->ListenerPositionType = h->ListenerPositionUnits = h->ReceiverPositionType
     = h->ReceiverPositionUnits = h->SourcePositionType = h->SourcePositionUnits
     = h->EmitterPositionType = h->EmitterPositionUnits = h->DataSamplingRateUnits
-    = h->ListenerViewType = h->ListenerViewUnits = NULL;
+    = h->ListenerViewType = h->ListenerViewUnits = h->EmitterViewUnits 
+    = h->EmitterViewType = h->SourceViewUnits = h->SourceViewType 
+    = h->RoomVolumeUnits = h->RoomTemperaturUnits = h->RoomCornersUnits
+    = h->RoomCornersType = h->ReceriverViewUnits = h->ReceriverViewType  = NULL;
 
     /* Default global attributes */
     h->Conventions = h->Version = h->SOFAConventions = h->SOFAConventionsVersion
     = h->APIName = h->APIVersion = h->ApplicationName = h->ApplicationVersion
     = h->AuthorContact = h->Comment = h->DataType = h->History = h->License
     = h->Organisation = h->References = h->RoomType = h->Origin = h->DateCreated
-    = h->DateModified = h->Title = h->DatabaseName = h->ListenerShortName = NULL;
+    = h->DateModified = h->Title = h->DatabaseName = h->ListenerShortName 
+    = h->EmitterDescription = h->EmitterShortName = h->SourceDescription
+    = h->SourceShortName = h->ReceiverDescription = h->ReceiverShortName
+    = h->ListenerDescription = h->Organization = h->RoomShortName
+    = h->RoomLocation = h->RoomGeometry = h->RoomDescription =  h->Organisation = NULL;
 
     /* Read the SOFA file */
     switch(option){
