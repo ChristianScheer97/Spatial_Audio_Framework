@@ -42,6 +42,7 @@ extern "C" {
 #ifdef SAF_ENABLE_SOFA_READER_MODULE
 
 #include "libmysofa/mysofa.h"
+#include "netcdf.h"
 
 /** SOFA file reader options */
 typedef enum{
@@ -270,6 +271,11 @@ typedef enum{
  * @see [4] https://www.sofaconventions.org/mediawiki/index.php/SingleRoomMIMOSRIR
  * @see [5] https://www.sofaconventions.org/mediawiki/index.php/MultiSpeakerBRIR
  */
+SAF_SOFA_ERROR_CODES saf_sofa_open_universal(saf_sofa_container* hSOFA,
+                                   char* sofa_filepath,
+                                   SAF_SOFA_READER_OPTIONS option,
+                                   bool isBRIR);
+
 SAF_SOFA_ERROR_CODES saf_sofa_open(saf_sofa_container* hSOFA,
                                    char* sofa_filepath,
                                    SAF_SOFA_READER_OPTIONS option);

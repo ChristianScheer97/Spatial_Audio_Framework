@@ -41,11 +41,12 @@
 /*                              Main Functions                                */
 /* ========================================================================== */
 
-SAF_SOFA_ERROR_CODES saf_sofa_open
+SAF_SOFA_ERROR_CODES saf_sofa_open_universal
 (
     saf_sofa_container* h,
     char* sofa_filepath,
-    SAF_SOFA_READER_OPTIONS option
+    SAF_SOFA_READER_OPTIONS option,
+    bool isBRIR
 )
 {
     /* libmysofa reader vars */
@@ -642,6 +643,11 @@ SAF_SOFA_ERROR_CODES saf_sofa_open
     }
 
     return SAF_SOFA_OK;
+}
+
+SAF_SOFA_ERROR_CODES saf_sofa_open(saf_sofa_container* hSOFA, char* sofa_filepath, SAF_SOFA_READER_OPTIONS option)
+{
+    saf_sofa_open_universal(hSOFA, sofa_filepath, option, false);
 }
 
 void saf_sofa_close

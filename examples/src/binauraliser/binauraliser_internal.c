@@ -139,7 +139,9 @@ void binauraliser_initHRTFsAndGainTables(void* const hBin)
 #ifdef SAF_ENABLE_SOFA_READER_MODULE
     if(!pData->useDefaultHRIRsFLAG && pData->sofa_filepath!=NULL){
         /* Load SOFA file */
-        error = saf_sofa_open(&sofa, pData->sofa_filepath, SAF_SOFA_READER_OPTION_DEFAULT);
+        //error = saf_sofa_open(&sofa, pData->sofa_filepath, SAF_SOFA_READER_OPTION_DEFAULT);
+        error = saf_sofa_open_universal(&sofa, pData->sofa_filepath, SAF_SOFA_READER_OPTION_NETCDF, true);
+
 
         /* Load defaults instead */
         if(error!=SAF_SOFA_OK || sofa.nReceivers!=NUM_EARS){
