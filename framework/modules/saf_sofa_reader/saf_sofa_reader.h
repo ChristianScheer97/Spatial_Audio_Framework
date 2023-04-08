@@ -72,6 +72,16 @@ typedef enum{
 
 } SAF_SOFA_READER_OPTIONS;
 
+/** SOFA file use cases (HRTF, BRIR, SRIR etc.) */
+typedef enum {
+    /** The default use case is HRTF */
+    SAF_SOFA_READER_USECASE_DEFAULT,
+
+    SAF_SOFA_READER_USECASE_HRIR,
+
+    SAF_SOFA_READER_USECASE_BRIR
+} SAF_SOFA_READER_USECASE;
+
 
 /* ========================================================================== */
 /*                          Public Structures/Enums                           */
@@ -236,7 +246,11 @@ typedef enum{
     /** The data-type of the SOFA data was not as expected */
     SAF_SOFA_ERROR_FORMAT_UNEXPECTED,
     /** NetCDF is not thread safe! */
-    SAF_SOFA_ERROR_NETCDF_IN_USE
+    SAF_SOFA_ERROR_NETCDF_IN_USE,
+    /** The wrong reader option was chosen. This error accurs, 
+    if you try to load a BRIR with the SAF_SOFA_READER_USECASE_BRIR flag 
+    without the reader option SAF_SOFA_READER_OPTION_NETCDF*/
+    SAF_SOFA_ERROR_INVALID_READER_OPTION
 
 } SAF_SOFA_ERROR_CODES;
 
@@ -274,7 +288,7 @@ typedef enum{
 SAF_SOFA_ERROR_CODES saf_sofa_open_universal(saf_sofa_container* hSOFA,
                                    char* sofa_filepath,
                                    SAF_SOFA_READER_OPTIONS option,
-                                   bool isBRIR);
+                                    SAF_SOFA_READER_USECASE usecase);
 
 SAF_SOFA_ERROR_CODES saf_sofa_open(saf_sofa_container* hSOFA,
                                    char* sofa_filepath,
