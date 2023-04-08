@@ -1160,7 +1160,7 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                             // address = array_ptr + ((i * dim2 + j) * dim3 + k) * dim4 + l 
                             // 
                             // with i,j,k,l being the index variables and dim2,dim3,dim4 the length of every dimension.
-                            // addary_ptr is the pointer to the whole array pointing to the array's first element.
+                            // array_ptr is the pointer to the whole array pointing to the array's first element.
 
                             int m, r, n, e;
                             for (m = 0; m < h->nSources; m++) {

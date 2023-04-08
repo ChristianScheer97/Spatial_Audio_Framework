@@ -8,6 +8,8 @@ PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/saf_hoa/saf_hoa.c
     ${CMAKE_CURRENT_SOURCE_DIR}/saf_hrir/saf_default_hrirs.c
     ${CMAKE_CURRENT_SOURCE_DIR}/saf_hrir/saf_hrir.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/saf_brir/saf_default_brirs.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/saf_brir/saf_brir.c
     ${CMAKE_CURRENT_SOURCE_DIR}/saf_reverb/saf_reverb_internal.c
     ${CMAKE_CURRENT_SOURCE_DIR}/saf_reverb/saf_reverb_internal.h
     ${CMAKE_CURRENT_SOURCE_DIR}/saf_reverb/saf_reverb.c
