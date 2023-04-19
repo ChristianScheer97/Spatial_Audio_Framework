@@ -1248,7 +1248,7 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
 #endif /* SAF_ENABLE_NETCDF */
             break;
             }
-    }
+    
 
     return SAF_SOFA_OK;
 }

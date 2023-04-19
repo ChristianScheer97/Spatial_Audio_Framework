@@ -42,7 +42,10 @@ extern "C" {
 #ifdef SAF_ENABLE_SOFA_READER_MODULE
 
 #include "libmysofa/mysofa.h"
+
+#ifdef SAF_ENABLE_NETCDF
 #include "netcdf.h"
+#endif /* SAF_ENABLE_NETCDF */
 
 /** SOFA file reader options */
 typedef enum{
