@@ -184,7 +184,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     strcpy(pData->progressBarText,"Estimating ITDs");
     pData->progressBar0_1 = 0.4f;
     pData->itds_s = realloc1d(pData->itds_s, pData->N_hrir_dirs*sizeof(float));
-    estimateITDs(pData->hrirs, pData->N_hrir_dirs, pData->hrir_loaded_len, pData->hrir_loaded_fs, pData->itds_s);
+    // estimateITDs(pData->hrirs, pData->N_hrir_dirs, pData->hrir_loaded_len, pData->hrir_loaded_fs, pData->itds_s);
 
     /* Resample the HRIRs if needed */
     if(pData->hrir_loaded_fs!=pData->fs){
