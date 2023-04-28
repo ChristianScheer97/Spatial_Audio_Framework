@@ -87,7 +87,7 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
     = h->ListenerViewType = h->ListenerViewUnits = h->EmitterViewUnits 
     = h->EmitterViewType = h->SourceViewUnits = h->SourceViewType 
     = h->RoomVolumeUnits = h->RoomTemperaturUnits = h->RoomCornersUnits
-    = h->RoomCornersType = h->ReceriverViewUnits = h->ReceriverViewType  = NULL;
+    = h->RoomCornersType = h->ReceiverViewUnits = h->ReceiverViewType  = NULL;
 
     /* Default global attributes */
     h->Conventions = h->Version = h->SOFAConventions = h->SOFAConventionsVersion

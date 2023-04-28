@@ -156,8 +156,26 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             pData->hrirs = realloc1d(pData->hrirs, pData->N_hrir_dirs*NUM_EARS*(pData->hrir_loaded_len)*sizeof(float));
             memcpy(pData->hrirs, sofa.DataIR, pData->N_hrir_dirs*NUM_EARS*(pData->hrir_loaded_len)*sizeof(float));
             pData->hrir_dirs_deg = realloc1d(pData->hrir_dirs_deg, pData->N_hrir_dirs*2*sizeof(float));
-            cblas_scopy(pData->N_hrir_dirs, sofa.SourcePosition, 3, pData->hrir_dirs_deg, 2); /* azi */
-            cblas_scopy(pData->N_hrir_dirs, &sofa.SourcePosition[1], 3, &pData->hrir_dirs_deg[1], 2); /* elev */ 
+            /*for (int i=0; i<360*3; i++){
+                printf("% .3f \n",sofa.ListenerView[i]);
+                printf("% .3f \n",sofa.ListenerUp[i]);
+            }*/
+            cblas_scopy(pData->N_hrir_dirs, sofa.ListenerView, 3, pData->hrir_dirs_deg, 2); /* azi */
+            cblas_scopy(pData->N_hrir_dirs, &sofa.ListenerView[1], 3, &pData->hrir_dirs_deg[1], 2); /* elev */
+            
+            pData->new_nSources = pData->nSources = sofa.nEmitters;
+            
+            /* Set Emitters to Points specified in BRIR */
+            for (int i=0; i<sofa.nEmitters; i++){
+                pData->src_dirs_xyz[i][0] = sofa.EmitterPosition[3*i+0];
+                pData->src_dirs_xyz[i][1] = sofa.EmitterPosition[3*i+1];
+                pData->src_dirs_xyz[i][2] = sofa.EmitterPosition[3*i+2];
+                
+                float temp_sph[3];
+                cart2sph(&sofa.EmitterPosition[3*i], 1, 1, temp_sph);
+                pData->src_dirs_deg[i][0] = temp_sph[0];
+                pData->src_dirs_deg[i][1] = temp_sph[1];
+            }
         }
 
         /* Clean-up */

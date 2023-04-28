@@ -44,7 +44,7 @@ void roombinauraliser_create
     /* user parameters */
     roombinauraliser_loadPreset(SOURCE_CONFIG_PRESET_DEFAULT, pData->src_dirs_deg, &(pData->new_nSources), &(dummy)); /*check setStateInformation if you change default preset*/
     pData->useDefaultHRIRsFLAG = 1; /* pars->sofa_filepath must be valid to set this to 0 */
-    pData->enableHRIRsDiffuseEQ = 1;
+    pData->enableHRIRsDiffuseEQ = 0;
     pData->nSources = pData->new_nSources;
     pData->interpMode = INTERP_TRI;
     pData->yaw = 0.0f;

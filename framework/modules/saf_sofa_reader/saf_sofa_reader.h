@@ -177,8 +177,8 @@ typedef struct _saf_sofa_container{
     char* ListenerViewUnits;      /**< {'degree, degree, metre'|'metre'} */
     char* ReceiverPositionType;   /**< {'cartesian'|'spherical'} */
     char* ReceiverPositionUnits;  /**< {'degree, degree, metre'|'metre'} */
-    char* ReceriverViewType;      /**< {'cartesian'} */
-    char* ReceriverViewUnits;     /**< {'metre'} */
+    char* ReceiverViewType;       /**< {'cartesian'} */
+    char* ReceiverViewUnits;      /**< {'metre'} */
     char* RoomCornersType;        /**< {'cartesian'} */
     char* RoomCornersUnits;       /**< {'metre'} */
     char* RoomTemperaturUnits;    /**< {'kelvin' | 'celsius' | 'fahrenheit'} */
