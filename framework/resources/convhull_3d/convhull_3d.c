@@ -410,7 +410,7 @@ void convhull_3d_build
             min_p = MIN(min_p, points[i*(d+1)+j]);
         }
         span[j] = max_p - min_p;
-        assert(span[j]>0.0000001f);
+        assert(span[j]>0.00000001f);
     }
 
     /* The initial convex hull is a simplex with (d+1) facets, where d is the number of dimensions */

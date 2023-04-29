@@ -153,6 +153,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             pData->hrir_loaded_fs = (int)sofa.DataSamplingRate;
             pData->hrir_loaded_len = sofa.DataLengthIR;
             pData->N_hrir_dirs = sofa.nSources;
+            pData->nEmitters = sofa.nEmitters;
             pData->hrirs = realloc1d(pData->hrirs, pData->N_hrir_dirs*NUM_EARS*(pData->hrir_loaded_len)*sizeof(float));
             memcpy(pData->hrirs, sofa.DataIR, pData->N_hrir_dirs*NUM_EARS*(pData->hrir_loaded_len)*sizeof(float));
             pData->hrir_dirs_deg = realloc1d(pData->hrir_dirs_deg, pData->N_hrir_dirs*2*sizeof(float));

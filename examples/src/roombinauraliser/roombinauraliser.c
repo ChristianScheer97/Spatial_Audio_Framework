@@ -46,6 +46,7 @@ void roombinauraliser_create
     pData->useDefaultHRIRsFLAG = 1; /* pars->sofa_filepath must be valid to set this to 0 */
     pData->enableHRIRsDiffuseEQ = 0;
     pData->nSources = pData->new_nSources;
+    pData->nEmitters = 0;
     pData->interpMode = INTERP_TRI;
     pData->yaw = 0.0f;
     pData->pitch = 0.0f;
@@ -199,13 +200,14 @@ void roombinauraliser_process
 )
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    int ch, ear, i, band, nSources;
+    int ch, ear, i, band, nSources, nEmitters;
     float Rxyz[3][3], hypotxy;
     int enableRotation;
 
     /* copy user parameters to local variables */
     nSources = pData->nSources;
     enableRotation = pData->enableRotation;
+    nEmitters = pData->nEmitters;
     
     /* apply binaural panner */
     if ((nSamples == roombinauraliser_FRAME_SIZE) && (pData->hrtf_fb!=NULL) && (pData->codecStatus==CODEC_STATUS_INITIALISED) ){

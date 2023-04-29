@@ -122,6 +122,7 @@ typedef struct _roombinauraliser
 
     /* user parameters */
     int nSources;                            /**< Current number of input/source signals */
+    int nEmitters;
     float src_dirs_deg[MAX_NUM_INPUTS][2];   /**< Current source/panning directions, in degrees */
     INTERP_MODES interpMode;                 /**< see #INTERP_MODES */
     int useDefaultHRIRsFLAG;                 /**< 1: use default HRIRs in database, 0: use those from SOFA file */
