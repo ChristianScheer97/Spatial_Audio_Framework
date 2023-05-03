@@ -262,8 +262,10 @@ void roombinauraliser_process
 
             /* Convolve this channel with the interpolated HRTF, and add it to the binaural buffer */
             for (band = 0; band < HYBRID_BANDS; band++)
-                for (ear = 0; ear < NUM_EARS; ear++)
+                for (ear = 0; ear < NUM_EARS; ear++) {
                     cblas_caxpy(TIME_SLOTS, &pData->hrtf_interp[ch][band][ear], pData->inputframeTF[band][ch], 1, pData->outputframeTF[band][ear], 1);
+                    //printf("%f + i%f\n", crealf(*pData->outputframeTF[band][ear]), cimagf(*pData->outputframeTF[band][ear]));
+                }
         }
 
         /* scale by number of sources */ 

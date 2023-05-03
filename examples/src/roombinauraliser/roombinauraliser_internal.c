@@ -158,24 +158,51 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             memcpy(pData->hrirs, sofa.DataIR, pData->N_hrir_dirs*NUM_EARS*(pData->hrir_loaded_len)*sizeof(float));
             pData->hrir_dirs_deg = realloc1d(pData->hrir_dirs_deg, pData->N_hrir_dirs*2*sizeof(float));
             /*for (int i=0; i<360*3; i++){
-                printf("% .3f \n",sofa.ListenerView[i]);
-                printf("% .3f \n",sofa.ListenerUp[i]);
-            }*/
+             printf("% .3f \n",sofa.ListenerView[i]);
+             printf("% .3f \n",sofa.ListenerUp[i]);
+             }*/
             cblas_scopy(pData->N_hrir_dirs, sofa.ListenerView, 3, pData->hrir_dirs_deg, 2); /* azi */
             cblas_scopy(pData->N_hrir_dirs, &sofa.ListenerView[1], 3, &pData->hrir_dirs_deg[1], 2); /* elev */
             
             pData->new_nSources = pData->nSources = sofa.nEmitters;
             
             /* Set Emitters to Points specified in BRIR */
-            for (int i=0; i<sofa.nEmitters; i++){
-                pData->src_dirs_xyz[i][0] = sofa.EmitterPosition[3*i+0];
-                pData->src_dirs_xyz[i][1] = sofa.EmitterPosition[3*i+1];
-                pData->src_dirs_xyz[i][2] = sofa.EmitterPosition[3*i+2];
-                
-                float temp_sph[3];
-                cart2sph(&sofa.EmitterPosition[3*i], 1, 1, temp_sph);
-                pData->src_dirs_deg[i][0] = temp_sph[0];
-                pData->src_dirs_deg[i][1] = temp_sph[1];
+            if (!strcmp(sofa.EmitterPositionUnits, "metre")) { /* strcmp returns 0 if both strings are equal, therefor !strcmp = true */
+                /* cartesian coordinates */
+                for (int i=0; i<sofa.nEmitters; i++){
+                    pData->src_dirs_xyz[i][0] = sofa.EmitterPosition[3*i+0];
+                    pData->src_dirs_xyz[i][1] = sofa.EmitterPosition[3*i+1];
+                    pData->src_dirs_xyz[i][2] = sofa.EmitterPosition[3*i+2];
+                    
+                    float temp_sph[3];
+                    cart2sph(&sofa.EmitterPosition[3*i], 1, 1, temp_sph);
+                    pData->src_dirs_deg[i][0] = temp_sph[0];
+                    pData->src_dirs_deg[i][1] = temp_sph[1];
+                }
+            }
+            else {
+                /* spherical coordinates */
+                for (int i=0; i<sofa.nEmitters; i++){
+                    if (sofa.EmitterPosition[3*i+0] > 180)
+                        pData->src_dirs_deg[i][0] = sofa.EmitterPosition[3*i+0] - 360.0;
+                    else if (sofa.EmitterPosition[3*i+0] < -180)
+                        pData->src_dirs_deg[i][0] = sofa.EmitterPosition[3*i+0] + 360.0;
+                    else
+                        pData->src_dirs_deg[i][0] = sofa.EmitterPosition[3*i+0];
+                    
+                    if (sofa.EmitterPosition[3*i+1] > 180)
+                        pData->src_dirs_deg[i][1] = sofa.EmitterPosition[3*i+1] - 360.0;
+                    else if (sofa.EmitterPosition[3*i+1] < -180)
+                        pData->src_dirs_deg[i][1] = sofa.EmitterPosition[3*i+1] + 360.0;
+                    else
+                        pData->src_dirs_deg[i][1] = sofa.EmitterPosition[3*i+1];
+                    
+                    float temp_sph[3];
+                    sph2cart(&sofa.EmitterPosition[3*i], 1, 1, temp_sph);
+                    pData->src_dirs_xyz[i][0] = temp_sph[0];
+                    pData->src_dirs_xyz[i][1] = temp_sph[1];
+                    pData->src_dirs_xyz[i][2] = temp_sph[2];
+                }
             }
         }
 
