@@ -112,6 +112,7 @@ typedef struct _roombinauraliser
     int recalc_hrtf_interpFLAG[MAX_NUM_INPUTS]; /**< 1: re-calculate/interpolate the HRTF, 0: do not */
     int reInitHRTFsAndGainTables;    /**< 1: reinitialise the HRTFs and interpolation tables, 0: do not */
     int recalc_M_rotFLAG;            /**< 1: re-calculate the rotation matrix, 0: do not */
+    int VBAP_3d_FLAG;                /**< 1: VBAP in 3 Dimensions, 0: VBAP in 2 Dimensions */
     
     /* misc. */
     float src_dirs_rot_deg[MAX_NUM_INPUTS][2]; /**< Intermediate rotated source directions, in degrees */
@@ -164,7 +165,8 @@ void roombinauraliser_interpHRTFs(void* const hBin,
                               INTERP_MODES mode,
                               float azimuth_deg,
                               float elevation_deg,
-                              float_complex h_intrp[HYBRID_BANDS][NUM_EARS]);
+                              float_complex h_intrp[HYBRID_BANDS][NUM_EARS],
+                              int VBAP_3d_Flag);
 
 /**
  * Initialise the HRTFs: either loading the default set or loading from a SOFA
