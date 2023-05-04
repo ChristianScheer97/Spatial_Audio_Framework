@@ -254,9 +254,9 @@ void roombinauraliser_process
         for (ch = 0; ch < nSources; ch++) {
             if(pData->recalc_hrtf_interpFLAG[ch]){
                 if(enableRotation)
-                    roombinauraliser_interpHRTFs(hBin, pData->interpMode, pData->src_dirs_rot_deg[ch][0], pData->src_dirs_rot_deg[ch][1], pData->hrtf_interp[ch], 0);
+                    roombinauraliser_interpHRTFs(hBin, pData->interpMode, pData->src_dirs_rot_deg[ch][0], pData->src_dirs_rot_deg[ch][1], pData->hrtf_interp[ch], pData->VBAP_3d_FLAG);
                 else
-                    roombinauraliser_interpHRTFs(hBin, pData->interpMode, pData->src_dirs_deg[ch][0], pData->src_dirs_deg[ch][1], pData->hrtf_interp[ch], 0);
+                    roombinauraliser_interpHRTFs(hBin, pData->interpMode, pData->src_dirs_deg[ch][0], pData->src_dirs_deg[ch][1], pData->hrtf_interp[ch], pData->VBAP_3d_FLAG);
                 pData->recalc_hrtf_interpFLAG[ch] = 0;
             }
 
