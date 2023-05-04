@@ -50,7 +50,7 @@ void roombinauraliser_interpHRTFs
     float azimuth_deg,
     float elevation_deg,
     float_complex h_intrp[HYBRID_BANDS][NUM_EARS],
-    int VBAP_3d_Flag
+    int VBAP_3d_FLAG
 )
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
@@ -69,7 +69,7 @@ void roombinauraliser_interpHRTFs
     aziIndex = (int)(matlab_fmodf(azimuth_deg + 180.0f, 360.0f) / aziRes + 0.5f);
     elevIndex = (int)((elevation_deg + 90.0f) / elevRes + 0.5f);
     idx3d = elevIndex * N_azi + aziIndex;
-    if (VBAP_3d_Flag)
+    if (VBAP_3d_FLAG)
         for (i = 0; i < 3; i++)
             weights[i] = pData->hrtf_vbap_gtableComp[idx3d*3 + i];
     else
@@ -82,7 +82,7 @@ void roombinauraliser_interpHRTFs
                 weights_cmplx[i] = cmplxf(weights[i], 0.0f);
             for (band = 0; band < HYBRID_BANDS; band++) {
                 for (i = 0; i < 3; i++){
-                    if (VBAP_3d_Flag) {
+                    if (VBAP_3d_FLAG) {
                         hrtf_fb3[0][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
                         hrtf_fb3[1][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
                     }
@@ -103,7 +103,7 @@ void roombinauraliser_interpHRTFs
             for (i = 0; i < 3; i++) {
                 itds3[i] = pData->itds_s[pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
                 for (band = 0; band < HYBRID_BANDS; band++) {
-                    if (VBAP_3d_Flag) {
+                    if (VBAP_3d_FLAG) {
                         magnitudes3[band][i][0] = pData->hrtf_fb_mag[band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
                         magnitudes3[band][i][1] = pData->hrtf_fb_mag[band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
                     }
