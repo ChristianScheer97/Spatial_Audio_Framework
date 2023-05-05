@@ -53,13 +53,16 @@ void roombinauraliser_interpHRTFs
     int VBAP_3d_FLAG
 )
 {
+    int nDirs = 3;
+    if (!VBAP_3d_FLAG)
+        nDirs = 2;
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     int i, band;
     int aziIndex, elevIndex, N_azi, idx3d;
     float_complex ipd;
-    float_complex weights_cmplx[3], hrtf_fb3[NUM_EARS][3];
-    float aziRes, elevRes, weights[3], itds3[3],  itdInterp;
-    float magnitudes3[HYBRID_BANDS][3][NUM_EARS], magInterp[HYBRID_BANDS][NUM_EARS];
+    float_complex weights_cmplx[nDirs], hrtf_fb3[NUM_EARS][nDirs];
+    float aziRes, elevRes, weights[nDirs], itds3[nDirs],  itdInterp;
+    float magnitudes3[HYBRID_BANDS][nDirs][NUM_EARS], magInterp[HYBRID_BANDS][NUM_EARS];
     const float_complex calpha = cmplxf(1.0f, 0.0f), cbeta = cmplxf(0.0f, 0.0f);
      
     /* find closest pre-computed VBAP direction */
@@ -69,30 +72,26 @@ void roombinauraliser_interpHRTFs
     aziIndex = (int)(matlab_fmodf(azimuth_deg + 180.0f, 360.0f) / aziRes + 0.5f);
     elevIndex = (int)((elevation_deg + 90.0f) / elevRes + 0.5f);
     idx3d = elevIndex * N_azi + aziIndex;
-    if (VBAP_3d_FLAG)
-        for (i = 0; i < 3; i++)
-            weights[i] = pData->hrtf_vbap_gtableComp[idx3d*3 + i];
-    else
-        for (i = 0; i < 3; i++)
-            weights[i] = pData->hrtf_vbap_gtableComp[aziIndex*3 + i];
-
+    
+    if (!VBAP_3d_FLAG)
+        idx3d = aziIndex;
+        
+    for (i = 0; i < nDirs; i++) {
+        weights[i] = pData->hrtf_vbap_gtableComp[idx3d*nDirs + i];
+        //printf("% .3f \n", weights[i]);
+    }
+    //printf("++++++++++++++ \n");
     switch(mode){
         case INTERP_TRI:
-            for (i = 0; i < 3; i++)
+            for (i = 0; i < nDirs; i++)
                 weights_cmplx[i] = cmplxf(weights[i], 0.0f);
             for (band = 0; band < HYBRID_BANDS; band++) {
-                for (i = 0; i < 3; i++){
-                    if (VBAP_3d_FLAG) {
-                        hrtf_fb3[0][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
-                        hrtf_fb3[1][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
-                    }
-                    else {
-                        hrtf_fb3[0][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[aziIndex*3+i]];
-                        hrtf_fb3[1][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[aziIndex*3+i]];
-                    }
+                for (i = 0; i < nDirs; i++){
+                        hrtf_fb3[0][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*nDirs+i]];
+                        hrtf_fb3[1][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*nDirs+i]];
                 } 
-                cblas_cgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, NUM_EARS, 1, 3, &calpha,
-                            (float_complex*)hrtf_fb3, 3,
+                cblas_cgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, NUM_EARS, 1, nDirs, &calpha,
+                            (float_complex*)hrtf_fb3, nDirs,
                             (float_complex*)weights_cmplx, 1, &cbeta,
                             (float_complex*)h_intrp[band], 1);
             }
@@ -103,14 +102,8 @@ void roombinauraliser_interpHRTFs
             for (i = 0; i < 3; i++) {
                 itds3[i] = pData->itds_s[pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
                 for (band = 0; band < HYBRID_BANDS; band++) {
-                    if (VBAP_3d_FLAG) {
                         magnitudes3[band][i][0] = pData->hrtf_fb_mag[band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
                         magnitudes3[band][i][1] = pData->hrtf_fb_mag[band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
-                    }
-                    else {
-                        magnitudes3[band][i][0] = pData->hrtf_fb_mag[band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[aziIndex*3+i]];
-                        magnitudes3[band][i][1] = pData->hrtf_fb_mag[band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[aziIndex*3+i]];
-                    }
                 }
             }
 
@@ -274,18 +267,14 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     
     pData->VBAP_3d_FLAG = 1;
     
+    /* choose between VBAP in 2D or 3D */
     float elevation_max = -90;
     float elevation_min = +90;
     for (int i=1; i<pData->N_hrir_dirs; i+=2) {
-        
-        if (pData->hrir_dirs_deg[i] > elevation_max)
-            elevation_max = pData->hrir_dirs_deg[i];
-        if (pData->hrir_dirs_deg[i] < elevation_min)
-            elevation_min = pData->hrir_dirs_deg[i];
-        printf("% .3f /  % .3f \n", elevation_min, elevation_max);
+        elevation_max = SAF_MAX(elevation_max, pData->hrir_dirs_deg[i]);
+        elevation_min = SAF_MIN(elevation_min, pData->hrir_dirs_deg[i]);
     }
-    
-    if (fabsf((elevation_min +90)/(180)-(elevation_max +90)/(180))< 1e-6) /* dont criticize the normalize*/
+    if (fabsf((elevation_min +90)/(180)-(elevation_max +90)/(180))< 1e-6) /* dont criticize the normalize */
         pData->VBAP_3d_FLAG = 0;
 
     if (pData->VBAP_3d_FLAG) {
@@ -305,8 +294,71 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     /* compress VBAP table (i.e. remove the zero elements) */
     pData->hrtf_vbap_gtableComp = realloc1d(pData->hrtf_vbap_gtableComp, pData->N_hrtf_vbap_gtable * 3 * sizeof(float));
     pData->hrtf_vbap_gtableIdx  = realloc1d(pData->hrtf_vbap_gtableIdx,  pData->N_hrtf_vbap_gtable * 3 * sizeof(int));
-    compressVBAPgainTable3D(hrtf_vbap_gtable, pData->N_hrtf_vbap_gtable, pData->N_hrir_dirs, pData->hrtf_vbap_gtableComp, pData->hrtf_vbap_gtableIdx);
+    if (pData->VBAP_3d_FLAG)
+        compressVBAPgainTable3D(hrtf_vbap_gtable, pData->N_hrtf_vbap_gtable, pData->N_hrir_dirs, pData->hrtf_vbap_gtableComp, pData->hrtf_vbap_gtableIdx);
+    else {
+         
+        float* vbap_gtableComp = pData->hrtf_vbap_gtableComp;
+        int* vbap_gtableIdx = pData->hrtf_vbap_gtableIdx;
+
+        
+        int i, j, nt;
+        int idx_nt[4] = {0,0,0,0};
+        float gains_nt[4] = {0,0,0,0};
+        float gains_sum;
+        
+        memset(vbap_gtableComp, 0, pData->N_hrtf_vbap_gtable*2*sizeof(float));
+        memset(vbap_gtableIdx, 0, pData->N_hrtf_vbap_gtable*2*sizeof(int));
+        int p = 0;
+        for (int x=0; x<pData->N_hrtf_vbap_gtable; x++) {
+            float maxData = 0.0f;
+            float maxData2 = 0.0f;
+            int idxmax = -1;
+            int idxmax2 = -1;
+            for (int i=0; i<pData->N_hrir_dirs; i++) {
+                if (hrtf_vbap_gtable[x*pData->N_hrir_dirs+i]>0.0000001f){
+                    if (hrtf_vbap_gtable[x*pData->N_hrir_dirs+i]>maxData2) {
+                        if (hrtf_vbap_gtable[x*pData->N_hrir_dirs+i]>maxData) {
+                            maxData2 = maxData;
+                            idxmax2 = idxmax;
+                            maxData = hrtf_vbap_gtable[x*pData->N_hrir_dirs+i];
+                            idxmax = i;
+                            //p++;
+                            //printf("%i %i %i % .13f % .13f \n", p, x, x*pData->N_hrir_dirs+i, hrtf_vbap_gtable[x*pData->N_hrir_dirs+i], maxData);
+                            
+                        }
+                        else {
+                            maxData2 = hrtf_vbap_gtable[x*pData->N_hrir_dirs+i];
+                            idxmax2 = i;
+                        }
+                    }
+                }
+            }
+            printf("%i % .50f % i \n", x, maxData, idxmax);
+            printf("%i % .50f % i \n", x, maxData2, idxmax2);
+            printf("\n");
+            vbap_gtableComp[x*2+0] = maxData/(maxData+maxData2);
+            vbap_gtableIdx[x*2+0] = idxmax;
+            if (idxmax2 != -1) {
+                vbap_gtableComp[x*2+1] = maxData2/(maxData+maxData2);
+                vbap_gtableIdx[x*2+1] = idxmax2;
+            }
+            else {
+                vbap_gtableComp[x*2+1] = 0.0;
+                vbap_gtableIdx[x*2+1] = idxmax;
+            }
+        }
+        pData->hrtf_vbap_gtableComp = vbap_gtableComp;
+        pData->hrtf_vbap_gtableIdx  = vbap_gtableIdx;
+    }
+        
     
+    /*for (int i=0; i<pData->N_hrtf_vbap_gtable; i+=3) {
+        printf("% i \t\t % .13f \n", pData->hrtf_vbap_gtableIdx[i], pData->hrtf_vbap_gtableComp[i]);
+        printf("% i \t\t % .13f \n", pData->hrtf_vbap_gtableIdx[i+1], pData->hrtf_vbap_gtableComp[i+1]);
+        printf("% i \t\t % .13f \n", pData->hrtf_vbap_gtableIdx[i+2], pData->hrtf_vbap_gtableComp[i+2]);
+        printf("#############################\n");
+    }*/
     /* convert hrirs to filterbank coefficients */
     pData->progressBar0_1 = 0.6f;
     pData->hrtf_fb = realloc1d(pData->hrtf_fb, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs)*sizeof(float_complex));

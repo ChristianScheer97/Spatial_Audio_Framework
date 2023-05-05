@@ -264,7 +264,6 @@ void roombinauraliser_process
             for (band = 0; band < HYBRID_BANDS; band++)
                 for (ear = 0; ear < NUM_EARS; ear++) {
                     cblas_caxpy(TIME_SLOTS, &pData->hrtf_interp[ch][band][ear], pData->inputframeTF[band][ch], 1, pData->outputframeTF[band][ear], 1);
-                    //printf("%f + i%f\n", crealf(*pData->outputframeTF[band][ear]), cimagf(*pData->outputframeTF[band][ear]));
                 }
         }
 
