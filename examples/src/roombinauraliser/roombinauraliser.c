@@ -47,7 +47,6 @@ void roombinauraliser_create
     pData->enableHRIRsDiffuseEQ = 0;
     pData->nSources = pData->new_nSources;
     pData->nEmitters = 0;
-    pData->interpMode = INTERP_TRI;
     pData->yaw = 0.0f;
     pData->pitch = 0.0f;
     pData->roll = 0.0f;
@@ -254,9 +253,9 @@ void roombinauraliser_process
         for (ch = 0; ch < nSources; ch++) {
             if(pData->recalc_hrtf_interpFLAG[ch]){
                 if(enableRotation)
-                    roombinauraliser_interpHRTFs(hBin, pData->interpMode, pData->src_dirs_rot_deg[ch][0], pData->src_dirs_rot_deg[ch][1], pData->hrtf_interp[ch]);
+                    roombinauraliser_interpHRTFs(hBin, pData->src_dirs_rot_deg[ch][0], pData->src_dirs_rot_deg[ch][1], pData->hrtf_interp[ch]);
                 else
-                    roombinauraliser_interpHRTFs(hBin, pData->interpMode, pData->src_dirs_deg[ch][0], pData->src_dirs_deg[ch][1], pData->hrtf_interp[ch]);
+                    roombinauraliser_interpHRTFs(hBin, pData->src_dirs_deg[ch][0], pData->src_dirs_deg[ch][1], pData->hrtf_interp[ch]);
                 pData->recalc_hrtf_interpFLAG[ch] = 0;
             }
 
@@ -443,7 +442,6 @@ void roombinauraliser_setInterpMode(void* const hBin, int newMode)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     int ch;
-    pData->interpMode = newMode;
     for(ch=0; ch<MAX_NUM_INPUTS; ch++)
         pData->recalc_hrtf_interpFLAG[ch] = 1;
 }
@@ -653,11 +651,6 @@ int roombinauraliser_getRPYflag(void* const hBin)
     return pData->useRollPitchYawFlag;
 }
 
-int roombinauraliser_getInterpMode(void* const hBin)
-{
-    roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    return (int)pData->interpMode;
-}
 
 int roombinauraliser_getProcessingDelay()
 {

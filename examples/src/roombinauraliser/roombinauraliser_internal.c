@@ -46,7 +46,6 @@ void roombinauraliser_setCodecStatus(void* const hBin, CODEC_STATUS newStatus)
 void roombinauraliser_interpHRTFs
 (
     void* const hBin,
-    INTERP_MODES mode,
     float azimuth_deg,
     float elevation_deg,
     float_complex h_intrp[HYBRID_BANDS][NUM_EARS]
@@ -71,54 +70,17 @@ void roombinauraliser_interpHRTFs
     for (i = 0; i < 3; i++)
         weights[i] = pData->hrtf_vbap_gtableComp[idx3d*3 + i];
 
-    switch(mode){
-        case INTERP_TRI:
-            for (i = 0; i < 3; i++)
-                weights_cmplx[i] = cmplxf(weights[i], 0.0f);
-            for (band = 0; band < HYBRID_BANDS; band++) {
-                for (i = 0; i < 3; i++){
-                    hrtf_fb3[0][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
-                    hrtf_fb3[1][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
-                } 
-                cblas_cgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, NUM_EARS, 1, 3, &calpha,
-                            (float_complex*)hrtf_fb3, 3,
-                            (float_complex*)weights_cmplx, 1, &cbeta,
-                            (float_complex*)h_intrp[band], 1);
-            }
-            break;
-
-        case INTERP_TRI_PS:
-            /* retrieve the 3 itds and hrtf magnitudes */
-            for (i = 0; i < 3; i++) {
-                itds3[i] = pData->itds_s[pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
-                for (band = 0; band < HYBRID_BANDS; band++) {
-                    magnitudes3[band][i][0] = pData->hrtf_fb_mag[band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
-                    magnitudes3[band][i][1] = pData->hrtf_fb_mag[band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
-                }
-            }
-
-            /* interpolate hrtf magnitudes and itd */
-            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 1, 1, 3, 1.0f,
-                        (float*)weights, 3,
-                        (float*)itds3, 1, 0.0f,
-                        &itdInterp, 1);
-            for (band = 0; band < HYBRID_BANDS; band++) {
-                cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 1, 2, 3, 1.0f,
-                            (float*)weights, 3,
-                            (float*)magnitudes3[band], 2, 0.0f,
-                            (float*)magInterp[band], 2);
-            }
-
-            /* introduce interaural phase difference */
-            for (band = 0; band < HYBRID_BANDS; band++) {
-                if(pData->freqVector[band]<1.5e3f)
-                    ipd = cmplxf(0.0f, (matlab_fmodf(2.0f*SAF_PI*(pData->freqVector[band]) * itdInterp + SAF_PI, 2.0f*SAF_PI) - SAF_PI)/2.0f);
-                else
-                    ipd = cmplxf(0.0f, 0.0f);
-                h_intrp[band][0] = crmulf(cexpf(ipd), magInterp[band][0]);
-                h_intrp[band][1] = crmulf(conjf(cexpf(ipd)), magInterp[band][1]);
-            }
-            break;
+    for (i = 0; i < 3; i++)
+        weights_cmplx[i] = cmplxf(weights[i], 0.0f);
+    for (band = 0; band < HYBRID_BANDS; band++) {
+        for (i = 0; i < 3; i++){
+            hrtf_fb3[0][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
+            hrtf_fb3[1][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
+        } 
+        cblas_cgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, NUM_EARS, 1, 3, &calpha,
+                    (float_complex*)hrtf_fb3, 3,
+                    (float_complex*)weights_cmplx, 1, &cbeta,
+                    (float_complex*)h_intrp[band], 1);
     }
 }
 
@@ -190,10 +152,10 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
                     else
                         pData->src_dirs_deg[i][0] = sofa.EmitterPosition[3*i+0];
                     
-                    if (sofa.EmitterPosition[3*i+1] > 180)
-                        pData->src_dirs_deg[i][1] = sofa.EmitterPosition[3*i+1] - 360.0;
-                    else if (sofa.EmitterPosition[3*i+1] < -180)
-                        pData->src_dirs_deg[i][1] = sofa.EmitterPosition[3*i+1] + 360.0;
+                    if (sofa.EmitterPosition[3 * i + 1] > 90)
+                        pData->src_dirs_deg[i][1] = sofa.EmitterPosition[3 * i + 1] - 180;
+                    else if (sofa.EmitterPosition[3 * i + 1] < -90)
+                        pData->src_dirs_deg[i][1] = sofa.EmitterPosition[3 * i + 1] + 180.0;
                     else
                         pData->src_dirs_deg[i][1] = sofa.EmitterPosition[3*i+1];
                     
@@ -255,8 +217,32 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     hrtf_vbap_gtable = NULL;
     pData->hrtf_vbapTableRes[0] = 2;
     pData->hrtf_vbapTableRes[1] = 5;
-    generateVBAPgainTable3D(pData->hrir_dirs_deg, pData->N_hrir_dirs, pData->hrtf_vbapTableRes[0], pData->hrtf_vbapTableRes[1], 1, 0, 0.0f,
-                            &hrtf_vbap_gtable, &(pData->N_hrtf_vbap_gtable), &(pData->nTriangles));
+    
+    pData->VBAP_3d_FLAG = 1;
+
+    float elevation_max = -90;
+    float elevation_min = +90;
+    for (int i = 1; i < pData->N_hrir_dirs; i += 2) {
+
+        if (pData->hrir_dirs_deg[i] > elevation_max)
+            elevation_max = pData->hrir_dirs_deg[i];
+        if (pData->hrir_dirs_deg[i] < elevation_min)
+            elevation_min = pData->hrir_dirs_deg[i];
+        printf("% .3f /  % .3f \n", elevation_min, elevation_max);
+    }
+
+    if (fabsf((elevation_min + 90) / (180) - (elevation_max + 90) / (180)) < 1e-6) /* dont criticize the normalize*/
+        pData->VBAP_3d_FLAG = 0;
+
+    if (pData->VBAP_3d_FLAG) {
+        generateVBAPgainTable3D(pData->hrir_dirs_deg, pData->N_hrir_dirs, pData->hrtf_vbapTableRes[0], pData->hrtf_vbapTableRes[1], 1, 0, 0.0f,
+            &hrtf_vbap_gtable, &(pData->N_hrtf_vbap_gtable), &(pData->nTriangles));
+    }
+    else {
+        generateVBAPgainTable2D(pData->hrir_dirs_deg, pData->N_hrir_dirs, pData->hrtf_vbapTableRes[0],
+            &hrtf_vbap_gtable, &(pData->N_hrtf_vbap_gtable), &(pData->nTriangles));
+    }
+
     if(hrtf_vbap_gtable==NULL){
         /* if generating vbap gain tabled failed, re-calculate with default HRIR set */
         pData->useDefaultHRIRsFLAG = 1;

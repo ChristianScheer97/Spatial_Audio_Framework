@@ -51,16 +51,6 @@
 extern "C" {
 #endif /* __cplusplus */
 
-/* ========================================================================== */
-/*                             Presets + Constants                            */
-/* ========================================================================== */
-
-/** Available interpolation modes */
-typedef enum {
-    INTERP_TRI = 1, /**< Triangular interpolation */
-    INTERP_TRI_PS   /**< Triangular interpolation (with phase-simplification) */
-}INTERP_MODES;
-
 
 /* ========================================================================== */
 /*                               Main Functions                               */
@@ -373,8 +363,6 @@ int roombinauraliser_getFlipRoll(void* const hBin);
  */
 int roombinauraliser_getRPYflag(void* const hBin);
 
-/** NOT IMPLEMENTED YET */
-int roombinauraliser_getInterpMode(void* const hBin);
 
 /**
  * Returns the processing delay in samples (may be used for delay compensation
