@@ -70,6 +70,8 @@ void roombinauraliser_interpHRTFs
     for (i = 0; i < 3; i++)
         weights[i] = pData->hrtf_vbap_gtableComp[idx3d*3 + i];
 
+
+    /* Interpolate */
     for (i = 0; i < 3; i++)
         weights_cmplx[i] = cmplxf(weights[i], 0.0f);
     for (band = 0; band < HYBRID_BANDS; band++) {
@@ -250,9 +252,47 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     }
     
     /* compress VBAP table (i.e. remove the zero elements) */
-    pData->hrtf_vbap_gtableComp = realloc1d(pData->hrtf_vbap_gtableComp, pData->N_hrtf_vbap_gtable * 3 * sizeof(float));
-    pData->hrtf_vbap_gtableIdx  = realloc1d(pData->hrtf_vbap_gtableIdx,  pData->N_hrtf_vbap_gtable * 3 * sizeof(int));
-    compressVBAPgainTable3D(hrtf_vbap_gtable, pData->N_hrtf_vbap_gtable, pData->N_hrir_dirs, pData->hrtf_vbap_gtableComp, pData->hrtf_vbap_gtableIdx);
+    
+    if (pData->VBAP_3d_FLAG) {
+        pData->hrtf_vbap_gtableComp = realloc1d(pData->hrtf_vbap_gtableComp, pData->N_hrtf_vbap_gtable * 3 * sizeof(float));
+        pData->hrtf_vbap_gtableIdx = realloc1d(pData->hrtf_vbap_gtableIdx, pData->N_hrtf_vbap_gtable * 3 * sizeof(int));
+        compressVBAPgainTable3D(hrtf_vbap_gtable, pData->N_hrtf_vbap_gtable, pData->N_hrir_dirs, pData->hrtf_vbap_gtableComp, pData->hrtf_vbap_gtableIdx);
+    }
+    else {
+        pData->hrtf_vbap_gtableComp = realloc1d(pData->hrtf_vbap_gtableComp, pData->N_hrtf_vbap_gtable * 2 * sizeof(float));
+        pData->hrtf_vbap_gtableIdx = realloc1d(pData->hrtf_vbap_gtableIdx, pData->N_hrtf_vbap_gtable * 2 * sizeof(int));
+        
+
+        /* Compress VBAP Gain Table 2D*/
+        int i, j, nt;
+        int idx_nt[3];
+        float gains_nt[3];
+        float gains_sum;
+
+        memset(pData->hrtf_vbap_gtableComp, 0, pData->N_hrtf_vbap_gtable * 3 * sizeof(float));
+        memset(pData->hrtf_vbap_gtableIdx, 0, pData->N_hrtf_vbap_gtable * 3 * sizeof(int));
+
+        /* compress table by keeping only the non-zero gains and their indices, and also convert to AMPLITUDE NORMALISED */
+        for (nt = 0; nt < pData->N_hrtf_vbap_gtable; nt++) {
+            gains_sum = 0.0f;
+
+            for (i = 0, j = 0; i < pData->N_hrir_dirs; i++) {
+                if (hrtf_vbap_gtable[nt * pData->N_hrir_dirs + i] > 0.0000001f) {
+                    gains_nt[j] = hrtf_vbap_gtable[nt * pData->N_hrir_dirs + i];
+                    //printf((char)hrtf_vbap_gtable[nt * pData->N_hrir_dirs + i]);
+                    gains_sum += gains_nt[j];
+                    idx_nt[j] = i;
+                    j++;
+                }
+            }
+            //saf_assert(j<4);
+            for (i = 0; i < j; i++) {
+                pData->hrtf_vbap_gtableComp[nt * 3 + i] = SAF_MAX(gains_nt[i] / gains_sum, 0.0f);
+                pData->hrtf_vbap_gtableIdx[nt * 3 + i] = idx_nt[i];
+            }
+        }
+    }
+
     
     /* convert hrirs to filterbank coefficients */
     pData->progressBar0_1 = 0.6f;
