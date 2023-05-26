@@ -76,7 +76,7 @@ typedef struct _roombinauraliser
     float** inputFrameTD;            /**< time-domain input frame; #MAX_NUM_INPUTS x #roombinauraliser_FRAME_SIZE */
     float** outframeTD;              /**< time-domain output frame; #NUM_EARS x #roombinauraliser_FRAME_SIZE */
     float_complex*** inputframeTF;   /**< time-frequency domain input frame; #HYBRID_BANDS x #MAX_NUM_INPUTS x #TIME_SLOTS */
-    float_complex*** outputframeTF;  /**< time-frequency domain input frame; #HYBRID_BANDS x #NUM_EARS x #TIME_SLOTS */
+    float_complex*** outputframeTF;  /**< time-frequency domain output frame; #HYBRID_BANDS x #NUM_EARS x #TIME_SLOTS */
     int fs;                          /**< Host sampling rate, in Hz */
     float freqVector[HYBRID_BANDS];  /**< Frequency vector (filterbank centre frequencies) */
     void* hSTFT;                     /**< afSTFT handle */
@@ -163,7 +163,7 @@ void roombinauraliser_setCodecStatus(void* const hBin,
 void roombinauraliser_interpHRTFs(void* const hBin,
                               float azimuth_deg,
                               float elevation_deg,
-                              float_complex h_intrp[HYBRID_BANDS][NUM_EARS]);
+                              float_complex h_intrp[MAX_NUM_INPUTS][HYBRID_BANDS][NUM_EARS]);
 
 /**
  * Initialise the HRTFs: either loading the default set or loading from a SOFA

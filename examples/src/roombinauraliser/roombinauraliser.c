@@ -199,14 +199,14 @@ void roombinauraliser_process
 )
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    int ch, ear, i, band, nSources, nEmitters;
+    int ch, ear, i, band, nSources;//, nEmitters;
     float Rxyz[3][3], hypotxy;
     int enableRotation;
 
     /* copy user parameters to local variables */
     nSources = pData->nSources;
     enableRotation = pData->enableRotation;
-    nEmitters = pData->nEmitters;
+    //nEmitters = pData->nEmitters;
     
     /* apply binaural panner */
     if ((nSamples == roombinauraliser_FRAME_SIZE) && (pData->hrtf_fb!=NULL) && (pData->codecStatus==CODEC_STATUS_INITIALISED) ){
@@ -250,24 +250,23 @@ void roombinauraliser_process
 
         /* interpolate hrtfs and apply to each source */
         memset(FLATTEN3D(pData->outputframeTF), 0, HYBRID_BANDS*NUM_EARS*TIME_SLOTS * sizeof(float_complex));
+        
+        if(pData->recalc_hrtf_interpFLAG[0]){ /* FLAG unabhängig vom channel, rausnehmen*/
+            if(enableRotation)
+                roombinauraliser_interpHRTFs(hBin, RAD2DEG(pData->yaw), RAD2DEG(pData->pitch), pData->hrtf_interp);
+            else
+                roombinauraliser_interpHRTFs(hBin, 0, 0, pData->hrtf_interp);
+            pData->recalc_hrtf_interpFLAG[ch] = 0;
+        }
+        
         for (ch = 0; ch < nSources; ch++) {
-            if(pData->recalc_hrtf_interpFLAG[ch]){
-                if(enableRotation)
-                    roombinauraliser_interpHRTFs(hBin, pData->src_dirs_rot_deg[ch][0], pData->src_dirs_rot_deg[ch][1], pData->hrtf_interp[ch]);
-                else
-                    roombinauraliser_interpHRTFs(hBin, pData->src_dirs_deg[ch][0], pData->src_dirs_deg[ch][1], pData->hrtf_interp[ch]);
-                pData->recalc_hrtf_interpFLAG[ch] = 0;
-            }
-
             /* Convolve this channel with the interpolated HRTF, and add it to the binaural buffer */
             for (band = 0; band < HYBRID_BANDS; band++)
-                for (ear = 0; ear < NUM_EARS; ear++) {
+                for (ear = 0; ear < NUM_EARS; ear++)
                     cblas_caxpy(TIME_SLOTS, &pData->hrtf_interp[ch][band][ear], pData->inputframeTF[band][ch], 1, pData->outputframeTF[band][ear], 1);
-                    //printf("%f + i%f\n", crealf(*pData->outputframeTF[band][ear]), cimagf(*pData->outputframeTF[band][ear]));
-                }
         }
 
-        /* scale by number of sources */ 
+        /* scale by number of sources */
         cblas_sscal(/*re+im*/2*HYBRID_BANDS*NUM_EARS*TIME_SLOTS, 1.0f/sqrtf((float)nSources), (float*)FLATTEN3D(pData->outputframeTF), 1);
 
         /* inverse-TFT */
