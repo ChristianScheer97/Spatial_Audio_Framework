@@ -63,6 +63,10 @@ void roombinauraliser_create
     pData->inputframeTF = (float_complex***)malloc3d(HYBRID_BANDS, MAX_NUM_INPUTS, TIME_SLOTS, sizeof(float_complex));
     pData->outputframeTF = (float_complex***)malloc3d(HYBRID_BANDS, NUM_EARS, TIME_SLOTS, sizeof(float_complex));
     
+    /* MultiConv */
+    pData->hMultiConv = NULL;
+    pData->enablePartitionedConv = 0;
+    
     /* hrir data */
     pData->hrirs = NULL;
     pData->hrir_dirs_deg = NULL;
@@ -88,10 +92,9 @@ void roombinauraliser_create
     pData->codecStatus = CODEC_STATUS_NOT_INITIALISED;
     pData->procStatus = PROC_STATUS_NOT_ONGOING;
     pData->reInitHRTFsAndGainTables = 1;
-    for(ch=0; ch<MAX_NUM_INPUTS; ch++) {
-        pData->recalc_hrtf_interpFLAG[ch] = 1;
+    pData->recalc_hrtf_interpFLAG = 1;
+    for(ch=0; ch<MAX_NUM_INPUTS; ch++)
         pData->src_gains[ch] = 1.f;
-    }
     pData->recalc_M_rotFLAG = 1; 
 }
 
@@ -145,11 +148,34 @@ void roombinauraliser_init
     afSTFT_getCentreFreqs(pData->hSTFT, (float)sampleRate, HYBRID_BANDS, pData->freqVector);
     if(pData->hrir_runtime_fs!=pData->fs){
         pData->reInitHRTFsAndGainTables = 1;
+        pData->reInitFilters = 1;
         roombinauraliser_setCodecStatus(hBin, CODEC_STATUS_NOT_INITIALISED);
     }
+    
+    if ((pData->reInitFilters == 1) && (pData->filters !=NULL)) {
+        pData->reInitFilters = 2;
+        if (pData->hMultiConv != NULL)
+            saf_multiConv_destroy(&(pData->hMultiConv));
+        saf_multiConv_create(&(pData->hMultiConv),
+                             roombinauraliser_FRAME_SIZE,
+                             pData->filters,
+                             pData->filter_length,
+                             pData->nfilters,
+                             pData->enablePartitionedConv);
 
-    /* defaults */
-    pData->recalc_M_rotFLAG = 1;
+        /* Resize buffers */
+        pData->inputFrameTD  = (float**)realloc2d((void**)pData->inputFrameTD, MAX_NUM_CHANNELS, roombinauraliser_FRAME_SIZE, sizeof(float));
+        pData->outframeTD = (float**)realloc2d((void**)pData->outframeTD, MAX_NUM_CHANNELS, roombinauraliser_FRAME_SIZE, sizeof(float));
+        memset(FLATTEN2D(pData->inputFrameTD), 0, MAX_NUM_CHANNELS*roombinauraliser_FRAME_SIZE*sizeof(float));
+
+        /* reset FIFO buffers */
+        pData->FIFO_idx = 0;
+        memset(pData->inFIFO, 0, MAX_NUM_CHANNELS*roombinauraliser_FRAME_SIZE*sizeof(float));
+        memset(pData->outFIFO, 0, MAX_NUM_CHANNELS*roombinauraliser_FRAME_SIZE*sizeof(float));
+
+        pData->reInitFilters = 0;
+    }
+
 }
 
 void roombinauraliser_initCodec
@@ -200,89 +226,113 @@ void roombinauraliser_process
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     int ch, ear, i, band, nSources;//, nEmitters;
-    float Rxyz[3][3], hypotxy;
     int enableRotation;
 
     /* copy user parameters to local variables */
     nSources = pData->nSources;
     enableRotation = pData->enableRotation;
     //nEmitters = pData->nEmitters;
+    pData->nChannels = nSources*NUM_EARS;
     
-    /* apply binaural panner */
-    if ((nSamples == roombinauraliser_FRAME_SIZE) && (pData->hrtf_fb!=NULL) && (pData->codecStatus==CODEC_STATUS_INITIALISED) ){
-        pData->procStatus = PROC_STATUS_ONGOING;
+    for(int s=0; s<nSamples; s++){
+        /* Load input signals into inFIFO buffer */
+        for(ch=0; ch<SAF_MIN(SAF_MIN(nInputs,pData->nChannels),MAX_NUM_CHANNELS); ch++)
+            pData->inFIFO[ch][pData->FIFO_idx] = inputs[ch][s];
+        for(; ch<pData->nChannels; ch++) /* Zero any channels that were not given */
+            pData->inFIFO[ch][pData->FIFO_idx] = 0.0f;
 
-        /* Load time-domain data */
-        for(i=0; i < SAF_MIN(nSources,nInputs); i++)
-            utility_svvcopy(inputs[i], roombinauraliser_FRAME_SIZE, pData->inputFrameTD[i]);
-        for(; i<nSources; i++)
-            memset(pData->inputFrameTD[i], 0, roombinauraliser_FRAME_SIZE * sizeof(float));
+        /* Pull output signals from outFIFO buffer */
+        for(ch=0; ch<SAF_MIN(SAF_MIN(nOutputs, pData->nChannels),MAX_NUM_CHANNELS); ch++)
+            outputs[ch][s] = pData->outFIFO[ch][pData->FIFO_idx];
+        for(; ch<nOutputs; ch++) /* Zero any extra channels */
+            outputs[ch][s] = 0.0f;
 
-        /* Apply source gains */
-        for (ch = 0; ch < nSources; ch++) {
-            if(fabsf(pData->src_gains[ch] - 1.f) > 1e-6f)
-                utility_svsmul(pData->inputFrameTD[ch], &(pData->src_gains[ch]), roombinauraliser_FRAME_SIZE, NULL);
-        }
+        /* Increment buffer index */
+        pData->FIFO_idx++;
 
-        /* Apply time-frequency transform (TFT) */
-        afSTFT_forward_knownDimensions(pData->hSTFT, pData->inputFrameTD, roombinauraliser_FRAME_SIZE, MAX_NUM_INPUTS, TIME_SLOTS, pData->inputframeTF);
+        /* Process frame if inFIFO is full and filters are loaded and saf_matrixConv_apply is ready for it */
+        if (pData->FIFO_idx >= roombinauraliser_FRAME_SIZE && pData->reInitFilters == 0 ) {
+            pData->FIFO_idx = 0;
 
-        /* Rotate source directions */
-        if(enableRotation && pData->recalc_M_rotFLAG){
-            yawPitchRoll2Rzyx (pData->yaw, pData->pitch, pData->roll, pData->useRollPitchYawFlag, Rxyz);
-            for(i=0; i<nSources; i++){
-                pData->src_dirs_xyz[i][0] = cosf(DEG2RAD(pData->src_dirs_deg[i][1])) * cosf(DEG2RAD(pData->src_dirs_deg[i][0]));
-                pData->src_dirs_xyz[i][1] = cosf(DEG2RAD(pData->src_dirs_deg[i][1])) * sinf(DEG2RAD(pData->src_dirs_deg[i][0]));
-                pData->src_dirs_xyz[i][2] = sinf(DEG2RAD(pData->src_dirs_deg[i][1]));
-                pData->recalc_hrtf_interpFLAG[i] = 1;
-            }
-            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nSources, 3, 3, 1.0f,
-                        (float*)(pData->src_dirs_xyz), 3,
-                        (float*)Rxyz, 3, 0.0f,
-                        (float*)(pData->src_dirs_rot_xyz), 3);
-            for(i=0; i<nSources; i++){
-                hypotxy = sqrtf(powf(pData->src_dirs_rot_xyz[i][0], 2.0f) + powf(pData->src_dirs_rot_xyz[i][1], 2.0f));
-                pData->src_dirs_rot_deg[i][0] = RAD2DEG(atan2f(pData->src_dirs_rot_xyz[i][1], pData->src_dirs_rot_xyz[i][0]));
-                pData->src_dirs_rot_deg[i][1] = RAD2DEG(atan2f(pData->src_dirs_rot_xyz[i][2], hypotxy));
-            }
-            pData->recalc_M_rotFLAG = 0;
-        }
+            /* Load time-domain data */
+            for(i=0; i < pData->nChannels; i++)
+                utility_svvcopy(pData->inFIFO[i], roombinauraliser_FRAME_SIZE, pData->inputFrameTD[i]);
 
-        /* interpolate hrtfs and apply to each source */
-        memset(FLATTEN3D(pData->outputframeTF), 0, HYBRID_BANDS*NUM_EARS*TIME_SLOTS * sizeof(float_complex));
-        
-        if(pData->recalc_hrtf_interpFLAG[0]){ /* FLAG unabhängig vom channel, rausnehmen*/
-            if(enableRotation)
-                roombinauraliser_interpHRTFs(hBin, RAD2DEG(pData->yaw), RAD2DEG(pData->pitch), pData->hrtf_interp);
+            /* Apply convolution */
+            if(pData->hMultiConv != NULL)
+                saf_multiConv_apply(pData->hMultiConv, FLATTEN2D(pData->inputFrameTD), FLATTEN2D(pData->outframeTD));
             else
-                roombinauraliser_interpHRTFs(hBin, 0, 0, pData->hrtf_interp);
-            pData->recalc_hrtf_interpFLAG[ch] = 0;
+                memset(FLATTEN2D(pData->outframeTD), 0, MAX_NUM_CHANNELS * (roombinauraliser_FRAME_SIZE)*sizeof(float));
+
+            /* copy signals to output buffer */
+            for (i = 0; i < SAF_MIN(pData->nChannels, MAX_NUM_CHANNELS); i++)
+                utility_svvcopy(pData->outframeTD[i], roombinauraliser_FRAME_SIZE, pData->outFIFO[i]);
         }
-        
-        for (ch = 0; ch < nSources; ch++) {
-            /* Convolve this channel with the interpolated HRTF, and add it to the binaural buffer */
-            for (band = 0; band < HYBRID_BANDS; band++)
-                for (ear = 0; ear < NUM_EARS; ear++)
-                    cblas_caxpy(TIME_SLOTS, &pData->hrtf_interp[ch][band][ear], pData->inputframeTF[band][ch], 1, pData->outputframeTF[band][ear], 1);
+        else if(pData->FIFO_idx >= roombinauraliser_FRAME_SIZE){
+            /* clear outFIFO if codec was not ready */
+            pData->FIFO_idx = 0;
+            memset(pData->outFIFO, 0, MAX_NUM_CHANNELS*roombinauraliser_FRAME_SIZE*sizeof(float));
+        }
+    }
+    
+   /* binauraliser source code */
+    if (0){
+        /* apply binaural panner */
+        if ((nSamples == roombinauraliser_FRAME_SIZE) && (pData->hrtf_fb!=NULL) && (pData->codecStatus==CODEC_STATUS_INITIALISED) ){
+            pData->procStatus = PROC_STATUS_ONGOING;
+
+            /* Load time-domain data */
+            for(i=0; i < SAF_MIN(nSources,nInputs); i++)
+                utility_svvcopy(inputs[i], roombinauraliser_FRAME_SIZE, pData->inputFrameTD[i]);
+            for(; i<nSources; i++)
+                memset(pData->inputFrameTD[i], 0, roombinauraliser_FRAME_SIZE * sizeof(float));
+
+            /* Apply source gains */
+            for (ch = 0; ch < nSources; ch++) {
+                if(fabsf(pData->src_gains[ch] - 1.f) > 1e-6f)
+                    utility_svsmul(pData->inputFrameTD[ch], &(pData->src_gains[ch]), roombinauraliser_FRAME_SIZE, NULL);
+            }
+
+            /* Apply time-frequency transform (TFT) */
+            afSTFT_forward_knownDimensions(pData->hSTFT, pData->inputFrameTD, roombinauraliser_FRAME_SIZE, MAX_NUM_INPUTS, TIME_SLOTS, pData->inputframeTF);
+
+
+            /* interpolate hrtfs and apply to each source */
+            //printf("%.3f \n",RAD2DEG(pData->yaw));
+            if(pData->recalc_hrtf_interpFLAG){
+                if(enableRotation)
+                    roombinauraliser_interpHRTFs(hBin, RAD2DEG(pData->yaw), RAD2DEG(pData->pitch), pData->hrtf_interp);
+                else
+                    roombinauraliser_interpHRTFs(hBin, 0, 0, pData->hrtf_interp);
+                pData->recalc_hrtf_interpFLAG = 0;
+            }
+            
+            memset(FLATTEN3D(pData->outputframeTF), 0, HYBRID_BANDS*NUM_EARS*TIME_SLOTS * sizeof(float_complex));
+            for (ch = 0; ch < nSources; ch++) {
+                /* Convolve this channel with the interpolated HRTF, and add it to the binaural buffer */
+                for (band = 0; band < HYBRID_BANDS; band++)
+                    for (ear = 0; ear < NUM_EARS; ear++)
+                        cblas_caxpy(TIME_SLOTS, &pData->hrtf_interp[ch][band][ear], pData->inputframeTF[band][ch], 1, pData->outputframeTF[band][ear], 1);
+            }
+
+            /* scale by number of sources */
+            cblas_sscal(/*re+im*/2*HYBRID_BANDS*NUM_EARS*TIME_SLOTS, 1.0f/sqrtf((float)nSources), (float*)FLATTEN3D(pData->outputframeTF), 1);
+
+            /* inverse-TFT */
+            afSTFT_backward_knownDimensions(pData->hSTFT, pData->outputframeTF, roombinauraliser_FRAME_SIZE, NUM_EARS, TIME_SLOTS, pData->outframeTD);
+
+            /* Copy to output buffer */
+            for (ch = 0; ch < SAF_MIN(NUM_EARS, nOutputs); ch++)
+                utility_svvcopy(pData->outframeTD[ch], roombinauraliser_FRAME_SIZE, outputs[ch]);
+            for (; ch < nOutputs; ch++)
+                memset(outputs[ch], 0, roombinauraliser_FRAME_SIZE*sizeof(float));
+        }
+        else{
+            for (ch=0; ch < nOutputs; ch++)
+                memset(outputs[ch],0, roombinauraliser_FRAME_SIZE*sizeof(float));
         }
 
-        /* scale by number of sources */
-        cblas_sscal(/*re+im*/2*HYBRID_BANDS*NUM_EARS*TIME_SLOTS, 1.0f/sqrtf((float)nSources), (float*)FLATTEN3D(pData->outputframeTF), 1);
-
-        /* inverse-TFT */
-        afSTFT_backward_knownDimensions(pData->hSTFT, pData->outputframeTF, roombinauraliser_FRAME_SIZE, NUM_EARS, TIME_SLOTS, pData->outframeTD);
-
-        /* Copy to output buffer */
-        for (ch = 0; ch < SAF_MIN(NUM_EARS, nOutputs); ch++)
-            utility_svvcopy(pData->outframeTD[ch], roombinauraliser_FRAME_SIZE, outputs[ch]);
-        for (; ch < nOutputs; ch++)
-            memset(outputs[ch], 0, roombinauraliser_FRAME_SIZE*sizeof(float));
     }
-    else{
-        for (ch=0; ch < nOutputs; ch++)
-            memset(outputs[ch],0, roombinauraliser_FRAME_SIZE*sizeof(float));
-    }
-
     pData->procStatus = PROC_STATUS_NOT_ONGOING;
 }
 
@@ -291,10 +341,8 @@ void roombinauraliser_process
 void roombinauraliser_refreshSettings(void* const hBin)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    int ch;
     pData->reInitHRTFsAndGainTables = 1;
-    for(ch=0; ch<MAX_NUM_INPUTS; ch++)
-        pData->recalc_hrtf_interpFLAG[ch] = 1;
+    pData->recalc_hrtf_interpFLAG = 1;
     roombinauraliser_setCodecStatus(hBin, CODEC_STATUS_NOT_INITIALISED);
 }
 
@@ -307,7 +355,7 @@ void roombinauraliser_setSourceAzi_deg(void* const hBin, int index, float newAzi
     newAzi_deg = SAF_MIN(newAzi_deg, 180.0f);
     if(pData->src_dirs_deg[index][0]!=newAzi_deg){
         pData->src_dirs_deg[index][0] = newAzi_deg;
-        pData->recalc_hrtf_interpFLAG[index] = 1;
+        pData->recalc_hrtf_interpFLAG = 1;
         pData->recalc_M_rotFLAG = 1;
     }
 }
@@ -319,7 +367,7 @@ void roombinauraliser_setSourceElev_deg(void* const hBin, int index, float newEl
     newElev_deg = SAF_MIN(newElev_deg, 90.0f);
     if(pData->src_dirs_deg[index][1] != newElev_deg){
         pData->src_dirs_deg[index][1] = newElev_deg;
-        pData->recalc_hrtf_interpFLAG[index] = 1;
+        pData->recalc_hrtf_interpFLAG = 1;
         pData->recalc_M_rotFLAG = 1;
     }
 }
@@ -363,24 +411,20 @@ void roombinauraliser_setEnableHRIRsDiffuseEQ(void* const hBin, int newState)
 void roombinauraliser_setInputConfigPreset(void* const hBin, int newPresetID)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    int ch, dummy;
+    int dummy;
     
     roombinauraliser_loadPreset(newPresetID, pData->src_dirs_deg, &(pData->new_nSources), &(dummy));
     if(pData->nSources != pData->new_nSources)
         roombinauraliser_setCodecStatus(hBin, CODEC_STATUS_NOT_INITIALISED);
-    for(ch=0; ch<MAX_NUM_INPUTS; ch++)
-        pData->recalc_hrtf_interpFLAG[ch] = 1;
+    pData->recalc_hrtf_interpFLAG = 1;
 }
 
 void roombinauraliser_setEnableRotation(void* const hBin, int newState)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    int ch;
 
     pData->enableRotation = newState;
-    if(!pData->enableRotation)
-        for (ch = 0; ch<MAX_NUM_INPUTS; ch++) 
-            pData->recalc_hrtf_interpFLAG[ch] = 1;
+    pData->recalc_hrtf_interpFLAG = 1;
 }
 
 void roombinauraliser_setYaw(void  * const hBin, float newYaw)
@@ -388,6 +432,7 @@ void roombinauraliser_setYaw(void  * const hBin, float newYaw)
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     pData->yaw = pData->bFlipYaw == 1 ? -DEG2RAD(newYaw) : DEG2RAD(newYaw);
     pData->recalc_M_rotFLAG = 1;
+    pData->recalc_hrtf_interpFLAG = 1;
 }
 
 void roombinauraliser_setPitch(void* const hBin, float newPitch)
@@ -395,6 +440,7 @@ void roombinauraliser_setPitch(void* const hBin, float newPitch)
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     pData->pitch = pData->bFlipPitch == 1 ? -DEG2RAD(newPitch) : DEG2RAD(newPitch);
     pData->recalc_M_rotFLAG = 1;
+    pData->recalc_hrtf_interpFLAG = 1;
 }
 
 void roombinauraliser_setRoll(void* const hBin, float newRoll)
@@ -402,6 +448,7 @@ void roombinauraliser_setRoll(void* const hBin, float newRoll)
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     pData->roll = pData->bFlipRoll == 1 ? -DEG2RAD(newRoll) : DEG2RAD(newRoll);
     pData->recalc_M_rotFLAG = 1;
+    pData->recalc_hrtf_interpFLAG = 1;
 }
 
 void roombinauraliser_setFlipYaw(void* const hBin, int newState)
@@ -442,7 +489,7 @@ void roombinauraliser_setInterpMode(void* const hBin, int newMode)
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     int ch;
     for(ch=0; ch<MAX_NUM_INPUTS; ch++)
-        pData->recalc_hrtf_interpFLAG[ch] = 1;
+        pData->recalc_hrtf_interpFLAG = 1;
 }
 
 void roombinauraliser_setSourceGain(void* const hAmbi, int srcIdx, float newGain)

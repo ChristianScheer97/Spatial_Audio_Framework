@@ -80,6 +80,7 @@ typedef struct _roombinauraliser
     int fs;                          /**< Host sampling rate, in Hz */
     float freqVector[HYBRID_BANDS];  /**< Frequency vector (filterbank centre frequencies) */
     void* hSTFT;                     /**< afSTFT handle */
+    void* hMultiConv;                /**< MultiConv handle */
     
     /* sofa file info */
     char* sofa_filepath;             /**< absolute/relevative file path for a sofa file */
@@ -109,14 +110,25 @@ typedef struct _roombinauraliser
     float progressBar0_1;            /**< Current (re)initialisation progress, between [0..1] */
     char* progressBarText;           /**< Current (re)initialisation step, string */
     PROC_STATUS procStatus;          /**< see #PROC_STATUS */
-    int recalc_hrtf_interpFLAG[MAX_NUM_INPUTS]; /**< 1: re-calculate/interpolate the HRTF, 0: do not */
+    int recalc_hrtf_interpFLAG;      /**< 1: re-calculate/interpolate the HRTF, 0: do not */
     int reInitHRTFsAndGainTables;    /**< 1: reinitialise the HRTFs and interpolation tables, 0: do not */
     int recalc_M_rotFLAG;            /**< 1: re-calculate the rotation matrix, 0: do not */
     int VBAP_3d_FLAG;                /**< 1: VBAP in 3 Dimensions, 0: VBAP in 2 Dimensions */
+    
+    /* multiConv  */
+    int FIFO_idx;                                                   /**< FIFO buffer index */
+    float inFIFO[MAX_NUM_CHANNELS][roombinauraliser_FRAME_SIZE];    /**< Input FIFO buffer */
+    float outFIFO[MAX_NUM_CHANNELS][roombinauraliser_FRAME_SIZE];   /**< Output FIFO buffer */
+    float* filters;                                                 /**< FLAT: nfilters x filter_length */
+    int nfilters;                                                   /**< Current number of FIR filters */
+    int filter_length;                                              /**< length of the filters (input_wav_length/nInputChannels) */
+    int reInitFilters;                                              /**< FLAG: 0: do not reinit, 1: reinit, 2: reinit in progress */
+    int nChannels;                                                  /**< Current number of input/output channels */
+    int enablePartitionedConv;                                      /**< 1: enable partitioned convolution, 0: regular convolution (fft over the length of the filter) */
 
     /* misc. */
-    float src_dirs_rot_deg[MAX_NUM_INPUTS][2]; /**< Intermediate rotated source directions, in degrees */
-    float src_dirs_rot_xyz[MAX_NUM_INPUTS][3]; /**< Intermediate rotated source directions, as unit-length Cartesian coordinates */
+    //float src_dirs_rot_deg[MAX_NUM_INPUTS][2]; /**< Intermediate rotated source directions, in degrees */
+    //float src_dirs_rot_xyz[MAX_NUM_INPUTS][3]; /**< Intermediate rotated source directions, as unit-length Cartesian coordinates */
     float src_dirs_xyz[MAX_NUM_INPUTS][3];     /**< Intermediate source directions, as unit-length Cartesian coordinates  */
     int nTriangles;                            /**< Number of triangles in the convex hull of the spherical arrangement of HRIR directions/points */
     int new_nSources;                          /**< New number of input/source signals (current value will be replaced by this after next re-init) */

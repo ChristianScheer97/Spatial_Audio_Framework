@@ -54,7 +54,7 @@ void roombinauraliser_interpHRTFs
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     int i, band;
     int aziIndex, elevIndex, N_azi, idx3d;
-    float_complex weights_cmplx[3], hrtf_fb3[pData->nSources][NUM_EARS][3];
+    float_complex weights_cmplx[3], hrtf_fb3[MAX_NUM_INPUTS][NUM_EARS][3];
     float aziRes, elevRes, weights[3];
     const float_complex calpha = cmplxf(1.0f, 0.0f), cbeta = cmplxf(0.0f, 0.0f);
      
@@ -75,9 +75,11 @@ void roombinauraliser_interpHRTFs
         weights_cmplx[i] = cmplxf(weights[i], 0.0f);
     for (int source=0; source < pData->nSources; source++){
         for (band = 0; band < HYBRID_BANDS; band++) {
+            printf(" azi \t\t|  elev \t\t|  idx \n");
             for (i = 0; i < 3; i++){
-                hrtf_fb3[source][0][i] = pData->hrtf_fb[band*NUM_EARS*(source+1)*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
-                hrtf_fb3[source][1][i] = pData->hrtf_fb[band*NUM_EARS*(source+1)*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
+                printf("%.3f \t\t| %.3f \t\t| %i \n", azimuth_deg, elevation_deg, pData->hrtf_vbap_gtableIdx[idx3d*3+i]);
+                hrtf_fb3[source][0][i] = pData->hrtf_fb[band*NUM_EARS*(source+1)*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i] ];
+                hrtf_fb3[source][1][i] = pData->hrtf_fb[band*NUM_EARS*(source+1)*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i] ];
             }
             cblas_cgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, NUM_EARS, 1, 3, &calpha,
                         (float_complex*)hrtf_fb3[source], 3,
@@ -226,7 +228,6 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     for (int i = 1; i < pData->N_hrir_dirs; i += 2) {
         elevation_max = SAF_MAX(elevation_max, pData->hrir_dirs_deg[i]);
         elevation_min = SAF_MIN(elevation_min, pData->hrir_dirs_deg[i]);
-        //printf("% .3f /  % .3f \n", elevation_min, elevation_max);
     }
 
     if (fabsf((elevation_min + 90) / (180) - (elevation_max + 90) / (180)) < 1e-6) /* dont criticize the normalize*/
@@ -259,7 +260,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     pData->progressBar0_1 = 0.6f;
     pData->hrtf_fb = realloc1d(pData->hrtf_fb, HYBRID_BANDS * NUM_EARS * pData->nSources * (pData->N_hrir_dirs)*sizeof(float_complex));
     for (int source = 0; source < pData->nSources; source++)
-        HRIRs2HRTFs_afSTFT(pData->hrirs, pData->N_hrir_dirs, pData->hrir_runtime_len, HOP_SIZE, 0, 1, pData->hrtf_fb+source*(HYBRID_BANDS * NUM_EARS*(pData->N_hrir_dirs)));
+        HRIRs2HRTFs_afSTFT(pData->hrirs+source*pData->N_hrir_dirs*HYBRID_BANDS * NUM_EARS, pData->N_hrir_dirs, pData->hrir_runtime_len, HOP_SIZE, 0, 1, pData->hrtf_fb+source*(HYBRID_BANDS * NUM_EARS*(pData->N_hrir_dirs)));
 
     /* HRIR pre-processing */
     if(pData->enableHRIRsDiffuseEQ){
@@ -289,11 +290,20 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
         pData->hrtf_fb_mag[i] = cabsf(pData->hrtf_fb[i]);
 
     /* The HRTFs should be re-interpolated */
-    for(i=0; i<MAX_NUM_INPUTS; i++)
-        pData->recalc_hrtf_interpFLAG[i] = 1;
+    pData->recalc_hrtf_interpFLAG = 1;
     
     /* clean-up */
     free(hrtf_vbap_gtable);
+    
+    /* multiConv filter copy*/
+    pData->nfilters = pData->nSources*NUM_EARS;
+    int nSamples = pData->filter_length = pData->hrir_runtime_len;
+    int dir = 1;
+    for (int ear=0;ear<pData->nSources; i++)
+        for (int src=0;i<pData->nSources; i++)
+            for (int i=0; i<pData->nfilters; i++){
+                memcpy(&(pData->filters[i*ear*nSamples]), &pData->hrirs[dir*ear*src], nSamples*sizeof(float));
+            }
 }
 
 void roombinauraliser_initTFT
