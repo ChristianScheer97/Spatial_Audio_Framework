@@ -152,29 +152,7 @@ void roombinauraliser_init
         roombinauraliser_setCodecStatus(hBin, CODEC_STATUS_NOT_INITIALISED);
     }
     
-    if ((pData->reInitFilters == 1) && (pData->filters !=NULL)) {
-        pData->reInitFilters = 2;
-        if (pData->hMultiConv != NULL)
-            saf_multiConv_destroy(&(pData->hMultiConv));
-        saf_multiConv_create(&(pData->hMultiConv),
-                             roombinauraliser_FRAME_SIZE,
-                             pData->filters,
-                             pData->filter_length,
-                             pData->nfilters,
-                             pData->enablePartitionedConv);
-
-        /* Resize buffers */
-        pData->inputFrameTD  = (float**)realloc2d((void**)pData->inputFrameTD, MAX_NUM_CHANNELS, roombinauraliser_FRAME_SIZE, sizeof(float));
-        pData->outframeTD = (float**)realloc2d((void**)pData->outframeTD, MAX_NUM_CHANNELS, roombinauraliser_FRAME_SIZE, sizeof(float));
-        memset(FLATTEN2D(pData->inputFrameTD), 0, MAX_NUM_CHANNELS*roombinauraliser_FRAME_SIZE*sizeof(float));
-
-        /* reset FIFO buffers */
-        pData->FIFO_idx = 0;
-        memset(pData->inFIFO, 0, MAX_NUM_CHANNELS*roombinauraliser_FRAME_SIZE*sizeof(float));
-        memset(pData->outFIFO, 0, MAX_NUM_CHANNELS*roombinauraliser_FRAME_SIZE*sizeof(float));
-
-        pData->reInitFilters = 0;
-    }
+    
 
 }
 
@@ -265,8 +243,23 @@ void roombinauraliser_process
                 memset(FLATTEN2D(pData->outframeTD), 0, MAX_NUM_CHANNELS * (roombinauraliser_FRAME_SIZE)*sizeof(float));
 
             /* copy signals to output buffer */
-            for (i = 0; i < SAF_MIN(pData->nChannels, MAX_NUM_CHANNELS); i++)
-                utility_svvcopy(pData->outframeTD[i], roombinauraliser_FRAME_SIZE, pData->outFIFO[i]);
+            for (i = 0; i < SAF_MIN(pData->nChannels, MAX_NUM_CHANNELS); i++){
+                if (i%2 == 0){
+                    if (i==0){
+                        utility_svvcopy(pData->outframeTD[i], roombinauraliser_FRAME_SIZE, pData->outFIFO[i]);
+                    }
+                    else
+                        cblas_saxpy(roombinauraliser_FRAME_SIZE, 1.0, pData->outFIFO[i], 1, pData->outframeTD[0], 1);
+                }
+                else {
+                    if (i==1){
+                        utility_svvcopy(pData->outframeTD[i], roombinauraliser_FRAME_SIZE, pData->outFIFO[i]);
+                    }
+                    else
+                        cblas_saxpy(roombinauraliser_FRAME_SIZE, 1.0, pData->outFIFO[i], 1, pData->outframeTD[1], 1);
+                }
+                
+            }
         }
         else if(pData->FIFO_idx >= roombinauraliser_FRAME_SIZE){
             /* clear outFIFO if codec was not ready */

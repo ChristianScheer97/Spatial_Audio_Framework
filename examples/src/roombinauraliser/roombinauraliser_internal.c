@@ -298,12 +298,37 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     /* multiConv filter copy*/
     pData->nfilters = pData->nSources*NUM_EARS;
     int nSamples = pData->filter_length = pData->hrir_runtime_len;
+    pData->filters = malloc1d(pData->nfilters*nSamples*sizeof(float));
+    //cblas_sscal(nSamples*10*NUM_EARS*MAX_NUM_CHANNELS, 1.0f/1000.0f, pData->hrirs, 1);
     int dir = 1;
-    for (int ear=0;ear<pData->nSources; i++)
-        for (int src=0;i<pData->nSources; i++)
-            for (int i=0; i<pData->nfilters; i++){
-                memcpy(&(pData->filters[i*ear*nSamples]), &pData->hrirs[dir*ear*src], nSamples*sizeof(float));
-            }
+    for (int ear=0;ear<NUM_EARS; ear++)
+        for (int src=0;src<pData->nSources; src++)
+            memcpy(&(pData->filters[ear*src*nSamples]), &pData->hrirs[dir*ear*src*nSamples], nSamples*sizeof(float));
+    
+    if ((pData->reInitFilters == 1) && (pData->filters !=NULL)) {
+        pData->reInitFilters = 2;
+        if (pData->hMultiConv != NULL)
+            saf_multiConv_destroy(&(pData->hMultiConv));
+        saf_multiConv_create(&(pData->hMultiConv),
+                             roombinauraliser_FRAME_SIZE,
+                             pData->filters,
+                             pData->hrir_runtime_len,
+                             pData->nfilters,
+                             pData->enablePartitionedConv);
+
+        /* Resize buffers */
+        pData->inputFrameTD  = (float**)realloc2d((void**)pData->inputFrameTD, MAX_NUM_CHANNELS, roombinauraliser_FRAME_SIZE, sizeof(float));
+        pData->outframeTD = (float**)realloc2d((void**)pData->outframeTD, MAX_NUM_CHANNELS, roombinauraliser_FRAME_SIZE, sizeof(float));
+        memset(FLATTEN2D(pData->inputFrameTD), 0, MAX_NUM_CHANNELS*roombinauraliser_FRAME_SIZE*sizeof(float));
+
+        /* reset FIFO buffers */
+        pData->FIFO_idx = 0;
+        memset(pData->inFIFO, 0, MAX_NUM_CHANNELS*roombinauraliser_FRAME_SIZE*sizeof(float));
+        memset(pData->outFIFO, 0, MAX_NUM_CHANNELS*roombinauraliser_FRAME_SIZE*sizeof(float));
+
+        pData->reInitFilters = 0;
+    }
+    
 }
 
 void roombinauraliser_initTFT
