@@ -212,6 +212,10 @@ void roombinauraliser_process
     //nEmitters = pData->nEmitters;
     pData->nChannels = nSources*NUM_EARS;
     
+    
+    
+    
+    
     for(int s=0; s<nSamples; s++){
         /* Load input signals into inFIFO buffer */
         for(ch=0; ch<SAF_MIN(SAF_MIN(nInputs,pData->nChannels),MAX_NUM_CHANNELS); ch++)
@@ -220,7 +224,7 @@ void roombinauraliser_process
             pData->inFIFO[ch][pData->FIFO_idx] = 0.0f;
 
         /* Pull output signals from outFIFO buffer */
-        for(ch=0; ch<SAF_MIN(SAF_MIN(nOutputs, pData->nChannels),MAX_NUM_CHANNELS); ch++)
+        for(ch=0; ch<NUM_EARS; ch++)
             outputs[ch][s] = pData->outFIFO[ch][pData->FIFO_idx];
         for(; ch<nOutputs; ch++) /* Zero any extra channels */
             outputs[ch][s] = 0.0f;
@@ -232,34 +236,41 @@ void roombinauraliser_process
         if (pData->FIFO_idx >= roombinauraliser_FRAME_SIZE && pData->reInitFilters == 0 ) {
             pData->FIFO_idx = 0;
 
+            /* Apply source gains */
+            for (ch = 0; ch < nSources; ch++) {
+                if(fabsf(pData->src_gains[ch] - 1.f) > 1e-6f)
+                    utility_svsmul(pData->inFIFO[ch], &(pData->src_gains[ch]), roombinauraliser_FRAME_SIZE, NULL);
+            }
+            
             /* Load time-domain data */
-            for(i=0; i < pData->nChannels; i++)
-                utility_svvcopy(pData->inFIFO[i], roombinauraliser_FRAME_SIZE, pData->inputFrameTD[i]);
-
+            int j = 0;
+            for(i=0; i < pData->nChannels; i=i+2) {
+                utility_svvcopy(pData->inFIFO[j], roombinauraliser_FRAME_SIZE, pData->inputFrameTD[i]);
+                utility_svvcopy(pData->inFIFO[j], roombinauraliser_FRAME_SIZE, pData->inputFrameTD[i+1]);
+                j++;
+            }
             /* Apply convolution */
             if(pData->hMultiConv != NULL)
                 saf_multiConv_apply(pData->hMultiConv, FLATTEN2D(pData->inputFrameTD), FLATTEN2D(pData->outframeTD));
             else
-                memset(FLATTEN2D(pData->outframeTD), 0, MAX_NUM_CHANNELS * (roombinauraliser_FRAME_SIZE)*sizeof(float));
+                memset(FLATTEN2D(pData->outframeTD), 0, MAX_NUM_CHANNELS * NUM_EARS * roombinauraliser_FRAME_SIZE*sizeof(float));
 
-            /* copy signals to output buffer */
-            for (i = 0; i < SAF_MIN(pData->nChannels, MAX_NUM_CHANNELS); i++){
-                if (i%2 == 0){
-                    if (i==0){
-                        utility_svvcopy(pData->outframeTD[i], roombinauraliser_FRAME_SIZE, pData->outFIFO[i]);
-                    }
-                    else
-                        cblas_saxpy(roombinauraliser_FRAME_SIZE, 1.0, pData->outFIFO[i], 1, pData->outframeTD[0], 1);
-                }
-                else {
-                    if (i==1){
-                        utility_svvcopy(pData->outframeTD[i], roombinauraliser_FRAME_SIZE, pData->outFIFO[i]);
-                    }
-                    else
-                        cblas_saxpy(roombinauraliser_FRAME_SIZE, 1.0, pData->outFIFO[i], 1, pData->outframeTD[1], 1);
-                }
-                
+            /* add all convolved signals to two channels, left and right */
+            for (int i=2; i < SAF_MIN(pData->nChannels, MAX_NUM_CHANNELS); i++)
+                cblas_saxpy(roombinauraliser_FRAME_SIZE, 1.0, pData->outframeTD[i], 1, pData->outframeTD[i%2], 1);
+            
+            if(pData->recalc_hrtf_interpFLAG){
+                if (enableRotation)
+                    roombinauraliser_reinitFilters(hBin);
+                pData->recalc_hrtf_interpFLAG = 0;
             }
+            
+            /* copy signals to output buffer */
+            utility_svvcopy(pData->outframeTD[0], roombinauraliser_FRAME_SIZE, pData->outFIFO[0]);
+            utility_svvcopy(pData->outframeTD[1], roombinauraliser_FRAME_SIZE, pData->outFIFO[1]);
+
+
+
         }
         else if(pData->FIFO_idx >= roombinauraliser_FRAME_SIZE){
             /* clear outFIFO if codec was not ready */
@@ -418,6 +429,16 @@ void roombinauraliser_setEnableRotation(void* const hBin, int newState)
 
     pData->enableRotation = newState;
     pData->recalc_hrtf_interpFLAG = 1;
+    if (!newState)
+        pData->yaw = pData->pitch = pData->roll = 0;
+}
+void roombinauraliser_setEnablePartConv(void* const hBin, int newState)
+{
+    roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
+    
+    pData->enablePartitionedConv = newState;
+    roombinauraliser_reinitFilters(hBin);
+    
 }
 
 void roombinauraliser_setYaw(void  * const hBin, float newYaw)

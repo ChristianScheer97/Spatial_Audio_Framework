@@ -295,39 +295,14 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     /* clean-up */
     free(hrtf_vbap_gtable);
     
-    /* multiConv filter copy*/
-    pData->nfilters = pData->nSources*NUM_EARS;
-    int nSamples = pData->filter_length = pData->hrir_runtime_len;
-    pData->filters = malloc1d(pData->nfilters*nSamples*sizeof(float));
-    //cblas_sscal(nSamples*10*NUM_EARS*MAX_NUM_CHANNELS, 1.0f/1000.0f, pData->hrirs, 1);
-    int dir = 1;
-    for (int ear=0;ear<NUM_EARS; ear++)
-        for (int src=0;src<pData->nSources; src++)
-            memcpy(&(pData->filters[ear*src*nSamples]), &pData->hrirs[dir*ear*src*nSamples], nSamples*sizeof(float));
     
-    if ((pData->reInitFilters == 1) && (pData->filters !=NULL)) {
-        pData->reInitFilters = 2;
-        if (pData->hMultiConv != NULL)
-            saf_multiConv_destroy(&(pData->hMultiConv));
-        saf_multiConv_create(&(pData->hMultiConv),
-                             roombinauraliser_FRAME_SIZE,
-                             pData->filters,
-                             pData->hrir_runtime_len,
-                             pData->nfilters,
-                             pData->enablePartitionedConv);
-
-        /* Resize buffers */
-        pData->inputFrameTD  = (float**)realloc2d((void**)pData->inputFrameTD, MAX_NUM_CHANNELS, roombinauraliser_FRAME_SIZE, sizeof(float));
-        pData->outframeTD = (float**)realloc2d((void**)pData->outframeTD, MAX_NUM_CHANNELS, roombinauraliser_FRAME_SIZE, sizeof(float));
-        memset(FLATTEN2D(pData->inputFrameTD), 0, MAX_NUM_CHANNELS*roombinauraliser_FRAME_SIZE*sizeof(float));
-
-        /* reset FIFO buffers */
-        pData->FIFO_idx = 0;
-        memset(pData->inFIFO, 0, MAX_NUM_CHANNELS*roombinauraliser_FRAME_SIZE*sizeof(float));
-        memset(pData->outFIFO, 0, MAX_NUM_CHANNELS*roombinauraliser_FRAME_SIZE*sizeof(float));
-
-        pData->reInitFilters = 0;
-    }
+    pData->yaw_backup = pData->pitch_backup = pData->roll_backup = -5;
+    roombinauraliser_reinitFilters(hBin);
+    /* Resize buffers */
+    pData->inputFrameTD  = (float**)realloc2d((void**)pData->inputFrameTD, MAX_NUM_CHANNELS*NUM_EARS, roombinauraliser_FRAME_SIZE, sizeof(float));
+    pData->outframeTD = (float**)realloc2d((void**)pData->outframeTD, MAX_NUM_CHANNELS*NUM_EARS, roombinauraliser_FRAME_SIZE, sizeof(float));
+    memset(FLATTEN2D(pData->inputFrameTD), 0, MAX_NUM_CHANNELS*NUM_EARS*roombinauraliser_FRAME_SIZE*sizeof(float));
+    
     
 }
 
@@ -345,6 +320,61 @@ void roombinauraliser_initTFT
         afSTFT_clearBuffers(pData->hSTFT);
     }
     pData->nSources = pData->new_nSources;
+}
+
+void roombinauraliser_reinitFilters
+(
+    void* const hBin
+)
+{
+    roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
+    
+    int azi_deg = RAD2DEG(pData->yaw);
+    int elev_deg = RAD2DEG(pData->pitch);
+    azi_deg = (azi_deg+360)%360;
+    elev_deg = (elev_deg+180)%180;
+    printf("%0.3d, %0.3f \n", azi_deg, pData->hrir_dirs_deg[azi_deg*2]);
+    
+    /* multiConv filter copy*/
+    if (fabsf(RAD2DEG(pData->yaw)-RAD2DEG(pData->yaw_backup))> 2     ||
+        fabsf(RAD2DEG(pData->pitch)-RAD2DEG(pData->pitch_backup))> 5 ||
+        fabsf(RAD2DEG(pData->roll)-RAD2DEG(pData->roll_backup))> 1) {
+        pData->nfilters = pData->nSources*NUM_EARS;
+        int nSamples = pData->filter_length = pData->hrir_runtime_len;
+        pData->filters = malloc1d(pData->nfilters*nSamples*sizeof(float));
+        int i = 0;
+        for (int ear=0;ear<NUM_EARS; ear++)
+            for (int src=0;src<pData->nSources; src++) {
+                memcpy(&(pData->filters[nSamples*i]), &pData->hrirs[nSamples*(azi_deg*NUM_EARS+ear*pData->nSources+src)], nSamples*sizeof(float));
+                i++;
+            }
+        pData->yaw_backup = pData->yaw;
+        pData->pitch_backup = pData->pitch;
+        pData->roll_backup = pData->roll;
+        pData->reInitFilters = 1;
+    }
+    
+    
+    if ((pData->reInitFilters == 1) && (pData->filters !=NULL)) {
+        pData->reInitFilters = 2;
+        if (pData->hMultiConv != NULL)
+            saf_multiConv_destroy(&(pData->hMultiConv));
+        saf_multiConv_create(&(pData->hMultiConv),
+                             roombinauraliser_FRAME_SIZE,
+                             pData->filters,
+                             pData->filter_length,
+                             pData->nfilters,
+                             pData->enablePartitionedConv);
+        
+        
+        
+        /* reset FIFO buffers */
+        pData->FIFO_idx = 0;
+        //memset(pData->inFIFO,  0, MAX_NUM_CHANNELS * roombinauraliser_FRAME_SIZE*sizeof(float));
+        //memset(pData->outFIFO, 0, NUM_EARS *         roombinauraliser_FRAME_SIZE*sizeof(float));
+        
+        pData->reInitFilters = 0;
+    }
 }
 
 void roombinauraliser_loadPreset

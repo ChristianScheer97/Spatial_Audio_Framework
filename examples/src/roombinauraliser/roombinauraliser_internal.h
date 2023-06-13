@@ -148,6 +148,10 @@ typedef struct _roombinauraliser
     int bFlipRoll;                           /**< flag to flip the sign of the roll rotation angle */
     int useRollPitchYawFlag;                 /**< rotation order flag, 1: r-p-y, 0: y-p-r */
     float src_gains[MAX_NUM_INPUTS];         /**< Gains applied per source */
+    
+    float yaw_backup;                        /**< backup angles to compare if recalc is necessary */
+    float pitch_backup;                      /**< backup angles to compare if recalc is necessary */
+    float roll_backup;                       /**< backup angles to compare if recalc is necessary */
 
 } roombinauraliser_data;
 
@@ -191,6 +195,12 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin);
  * @note Call this function before roombinauraliser_initHRTFsAndGainTables()
  */
 void roombinauraliser_initTFT(void* const hBin);
+
+/**
+ * Re-initialises the filters for multiConv.
+ *
+ */
+void roombinauraliser_reinitFilters(void*const hBin);
 
 /**
  * Returns the source directions for a specified source config preset.
