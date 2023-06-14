@@ -1133,8 +1133,8 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                             
                             /* Pull data */
                             
-                            /* shape [mRnE] */
-                            if (!strcmp((char*)h->SOFAConventions, "SingleRoomMIMOSRIR")) { 
+                            
+                            if (!strcmp((char*)h->SOFAConventions, "SingleRoomMIMOSRIR")) { /* shape [mRnE] */
                                 //if (h->nSources != -1 && h->nSources != (int)dimlength[dimid[dimids[0]]]) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
                                 if (h->nReceivers != -1 && h->nReceivers != (int)dimlength[dimid[dimids[1]]]) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
                                 if (h->nEmitters != -1 && h->nEmitters != (int)dimlength[dimid[dimids[3]]]) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
@@ -1153,27 +1153,19 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                                 
                                 nc_get_var(ncid, varid, tmp_data);
                                 
-                                // Reshape from [mRnE] to[mREn] for the sake of performance
-                                // 
-                                // forumla for pointer arithmetic of 4-dimensional c-arrays:
-                                // 
-                                // address = array_ptr + ((i * dim2 + j) * dim3 + k) * dim4 + l 
-                                // 
-                                // with i,j,k,l being the index variables and dim2,dim3,dim4 the length of every dimension.
-                                // array_ptr is the pointer to the whole array pointing to the array's first element.
-                                
-                                int m = h->nSources;
-                                int r = h->nReceivers;;
-                                int n = h->DataLengthIR;
-                                int e = h->nEmitters;
+                                // Reshape from [mRnE] to[mREn] for the sake of performance                                
+                                int n_m = h->nSources;
+                                int n_r = h->nReceivers;;
+                                int n_n = h->DataLengthIR;
+                                int n_e = h->nEmitters;
 
-                                for (int i = 0; i < m; i++) {
-                                    for (int j = 0; j < r; j++) {
-                                        for (int k = 0; k < n; k++) {
-                                            for (int l = 0; l < e; l++) {
-                                                int idx4D = i * r * n * e + j * n * e + k * e + l;
-                                                int idx3D = i * r * e * n + j * e * n + l * n + k;
-                                                tmp_data_reshaped[idx3D] = tmp_data[idx4D];
+                                for (int m = 0; m < n_m; m++) {
+                                    for (int r = 0; r < n_r; r++) {
+                                        for (int n = 0; n < n_n; n++) {
+                                            for (int e = 0; e < n_e; e++) {
+                                                int idxOld = m * n_r * n_n * n_e + r * n_n * n_e + n * n_e + e;
+                                                int idxNew = m * n_r * n_e * n_n + r * n_e * n_n + e * n_n + n;
+                                                tmp_data_reshaped[idxNew] = tmp_data[idxOld];
                                             }
                                         }
                                     }
