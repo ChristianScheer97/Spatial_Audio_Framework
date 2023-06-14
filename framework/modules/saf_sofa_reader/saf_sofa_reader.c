@@ -1162,22 +1162,23 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                                 // with i,j,k,l being the index variables and dim2,dim3,dim4 the length of every dimension.
                                 // array_ptr is the pointer to the whole array pointing to the array's first element.
                                 
-                                int m, r, n, e;
-                                for (m = 0; m < h->nSources; m++) {
-                                    for (r = 0; r < h->nReceivers; r++) {
-                                        for (n = 0; n < h->DataLengthIR; n++) {
-                                            for (e = 0; e < h->nEmitters; e++) {
-                                                /* get source and destination pointers with pointer arithmetic and the formular above */
-                                                double* sourcep = tmp_data + ((m * h->nReceivers + r) * h->DataLengthIR + n) * h->nEmitters + e; 
-                                                double* destp = tmp_data_reshaped + ((m * h->nReceivers + r) * h->nEmitters + e) * h->DataLengthIR + n;
-                                                
-                                                /* set the value of the destination pointer's address to the value of the source pointer's address */
-                                                destp = sourcep;
+                                int m = h->nSources;
+                                int r = h->nReceivers;;
+                                int n = h->DataLengthIR;
+                                int e = h->nEmitters;
+
+                                for (int i = 0; i < m; i++) {
+                                    for (int j = 0; j < r; j++) {
+                                        for (int k = 0; k < n; k++) {
+                                            for (int l = 0; l < e; l++) {
+                                                int idx4D = i * r * n * e + j * n * e + k * e + l;
+                                                int idx3D = i * r * e * n + j * e * n + l * n + k;
+                                                tmp_data_reshaped[idx3D] = tmp_data[idx4D];
                                             }
                                         }
                                     }
                                 }
-                                
+
                                 h->DataIR = malloc1d(tmp_size * sizeof(float));
                                 for (i = 0; i < (int)tmp_size; i++)
                                     h->DataIR[i] = (float)tmp_data_reshaped[i];          
