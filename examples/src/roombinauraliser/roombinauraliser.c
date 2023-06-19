@@ -142,6 +142,8 @@ void roombinauraliser_init
 )
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
+
+    pData->FIFO_idx = 0;
     
     /* define frequency vector */
     pData->fs = sampleRate;
