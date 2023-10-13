@@ -171,6 +171,9 @@ void roombinauraliser_setInputConfigPreset(void* const hBin, int newPresetID);
 /** Sets the flag to enable/disable (1 or 0) rotation */
 void roombinauraliser_setEnableRotation(void* const hBin, int newState);
 
+/** Enables/disables partitioned convolution */
+void roombinauraliser_setEnablePartConv(void* const hBin, int newState);
+
 /** Sets the 'yaw' rotation angle, in DEGREES */
 void roombinauraliser_setYaw(void* const hBin, float newYaw);
 

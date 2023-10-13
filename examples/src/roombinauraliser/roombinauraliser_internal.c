@@ -54,7 +54,7 @@ void roombinauraliser_interpHRTFs
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     int i, band;
     int aziIndex, elevIndex, N_azi, idx3d;
-    float_complex weights_cmplx[3], hrtf_fb3[pData->nSources][NUM_EARS][3];
+    float_complex weights_cmplx[3], hrtf_fb3[MAX_NUM_INPUTS][NUM_EARS][3];
     float aziRes, elevRes, weights[3];
     const float_complex calpha = cmplxf(1.0f, 0.0f), cbeta = cmplxf(0.0f, 0.0f);
      
@@ -290,7 +290,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
 
     /* The HRTFs should be re-interpolated */
     for(i=0; i<MAX_NUM_INPUTS; i++)
-        pData->recalc_hrtf_interpFLAG[i] = 1;
+        pData->recalc_hrtf_interpFLAG = 1;
     
     /* clean-up */
     free(hrtf_vbap_gtable);

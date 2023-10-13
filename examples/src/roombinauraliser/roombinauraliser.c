@@ -89,7 +89,7 @@ void roombinauraliser_create
     pData->procStatus = PROC_STATUS_NOT_ONGOING;
     pData->reInitHRTFsAndGainTables = 1;
     for(ch=0; ch<MAX_NUM_INPUTS; ch++) {
-        pData->recalc_hrtf_interpFLAG[ch] = 1;
+        pData->recalc_hrtf_interpFLAG = 1;
         pData->src_gains[ch] = 1.f;
     }
     pData->recalc_M_rotFLAG = 1; 
@@ -234,8 +234,9 @@ void roombinauraliser_process
                 pData->src_dirs_xyz[i][0] = cosf(DEG2RAD(pData->src_dirs_deg[i][1])) * cosf(DEG2RAD(pData->src_dirs_deg[i][0]));
                 pData->src_dirs_xyz[i][1] = cosf(DEG2RAD(pData->src_dirs_deg[i][1])) * sinf(DEG2RAD(pData->src_dirs_deg[i][0]));
                 pData->src_dirs_xyz[i][2] = sinf(DEG2RAD(pData->src_dirs_deg[i][1]));
-                pData->recalc_hrtf_interpFLAG[i] = 1;
             }
+                pData->recalc_hrtf_interpFLAG = 1;
+            
             cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nSources, 3, 3, 1.0f,
                         (float*)(pData->src_dirs_xyz), 3,
                         (float*)Rxyz, 3, 0.0f,
@@ -251,12 +252,12 @@ void roombinauraliser_process
         /* interpolate hrtfs and apply to each source */
         memset(FLATTEN3D(pData->outputframeTF), 0, HYBRID_BANDS*NUM_EARS*TIME_SLOTS * sizeof(float_complex));
         
-        if(pData->recalc_hrtf_interpFLAG[0]){ /* FLAG unabhängig vom channel, rausnehmen*/
+        if(pData->recalc_hrtf_interpFLAG){
             if(enableRotation)
                 roombinauraliser_interpHRTFs(hBin, RAD2DEG(pData->yaw), RAD2DEG(pData->pitch), pData->hrtf_interp);
             else
                 roombinauraliser_interpHRTFs(hBin, 0, 0, pData->hrtf_interp);
-            pData->recalc_hrtf_interpFLAG[ch] = 0;
+            pData->recalc_hrtf_interpFLAG = 0;
         }
         
         for (ch = 0; ch < nSources; ch++) {
@@ -294,7 +295,7 @@ void roombinauraliser_refreshSettings(void* const hBin)
     int ch;
     pData->reInitHRTFsAndGainTables = 1;
     for(ch=0; ch<MAX_NUM_INPUTS; ch++)
-        pData->recalc_hrtf_interpFLAG[ch] = 1;
+        pData->recalc_hrtf_interpFLAG = 1;
     roombinauraliser_setCodecStatus(hBin, CODEC_STATUS_NOT_INITIALISED);
 }
 
@@ -307,7 +308,7 @@ void roombinauraliser_setSourceAzi_deg(void* const hBin, int index, float newAzi
     newAzi_deg = SAF_MIN(newAzi_deg, 180.0f);
     if(pData->src_dirs_deg[index][0]!=newAzi_deg){
         pData->src_dirs_deg[index][0] = newAzi_deg;
-        pData->recalc_hrtf_interpFLAG[index] = 1;
+        pData->recalc_hrtf_interpFLAG = 1;
         pData->recalc_M_rotFLAG = 1;
     }
 }
@@ -319,7 +320,7 @@ void roombinauraliser_setSourceElev_deg(void* const hBin, int index, float newEl
     newElev_deg = SAF_MIN(newElev_deg, 90.0f);
     if(pData->src_dirs_deg[index][1] != newElev_deg){
         pData->src_dirs_deg[index][1] = newElev_deg;
-        pData->recalc_hrtf_interpFLAG[index] = 1;
+        pData->recalc_hrtf_interpFLAG = 1;
         pData->recalc_M_rotFLAG = 1;
     }
 }
@@ -369,7 +370,7 @@ void roombinauraliser_setInputConfigPreset(void* const hBin, int newPresetID)
     if(pData->nSources != pData->new_nSources)
         roombinauraliser_setCodecStatus(hBin, CODEC_STATUS_NOT_INITIALISED);
     for(ch=0; ch<MAX_NUM_INPUTS; ch++)
-        pData->recalc_hrtf_interpFLAG[ch] = 1;
+        pData->recalc_hrtf_interpFLAG = 1;
 }
 
 void roombinauraliser_setEnableRotation(void* const hBin, int newState)
@@ -380,7 +381,13 @@ void roombinauraliser_setEnableRotation(void* const hBin, int newState)
     pData->enableRotation = newState;
     if(!pData->enableRotation)
         for (ch = 0; ch<MAX_NUM_INPUTS; ch++) 
-            pData->recalc_hrtf_interpFLAG[ch] = 1;
+            pData->recalc_hrtf_interpFLAG = 1;
+}
+
+void roombinauraliser_setEnablePartConv(void* const hBin, int newState)
+{
+    roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
+    pData->enablePartConv = newState;
 }
 
 void roombinauraliser_setYaw(void  * const hBin, float newYaw)
@@ -442,7 +449,7 @@ void roombinauraliser_setInterpMode(void* const hBin, int newMode)
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     int ch;
     for(ch=0; ch<MAX_NUM_INPUTS; ch++)
-        pData->recalc_hrtf_interpFLAG[ch] = 1;
+        pData->recalc_hrtf_interpFLAG = 1;
 }
 
 void roombinauraliser_setSourceGain(void* const hAmbi, int srcIdx, float newGain)

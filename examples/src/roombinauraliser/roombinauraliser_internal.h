@@ -109,7 +109,7 @@ typedef struct _roombinauraliser
     float progressBar0_1;            /**< Current (re)initialisation progress, between [0..1] */
     char* progressBarText;           /**< Current (re)initialisation step, string */
     PROC_STATUS procStatus;          /**< see #PROC_STATUS */
-    int recalc_hrtf_interpFLAG[MAX_NUM_INPUTS]; /**< 1: re-calculate/interpolate the HRTF, 0: do not */
+    int recalc_hrtf_interpFLAG; /**< 1: re-calculate/interpolate the HRTF, 0: do not */
     int reInitHRTFsAndGainTables;    /**< 1: reinitialise the HRTFs and interpolation tables, 0: do not */
     int recalc_M_rotFLAG;            /**< 1: re-calculate the rotation matrix, 0: do not */
     int VBAP_3d_FLAG;                /**< 1: VBAP in 3 Dimensions, 0: VBAP in 2 Dimensions */
@@ -128,6 +128,7 @@ typedef struct _roombinauraliser
     int useDefaultHRIRsFLAG;                 /**< 1: use default HRIRs in database, 0: use those from SOFA file */
     int enableHRIRsDiffuseEQ;                /**< flag to diffuse-field equalisation to the currently loaded HRTFs */
     int enableRotation;                      /**< 1: enable rotation, 0: disable */
+    int enablePartConv;                      /**< 1 enable partitioned convolution, 0: disable */
     float yaw;                               /**< yaw (Euler) rotation angle, in degrees */
     float roll;                              /**< roll (Euler) rotation angle, in degrees */
     float pitch;                             /**< pitch (Euler) rotation angle, in degrees */
