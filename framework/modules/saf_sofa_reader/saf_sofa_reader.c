@@ -970,8 +970,9 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                         else if (!strcmp((char*)varname, "ListenerUp")) {
                             /* Checks */
                             if (ndimsp != 2) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
-                            if ((int)dimlength[dimid[dimids[1]]] != 3 && (int)dimlength[dimid[dimids[0]]] != 3) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
-                            if ((int)dimlength[dimid[dimids[1]]] != 1 && (int)dimlength[dimid[dimids[0]]] != 1) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
+                            //if ((int)dimlength[dimid[dimids[1]]] != 3 && (int)dimlength[dimid[dimids[0]]] != 3) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
+                            //if ((int)dimlength[dimid[dimids[1]]] != 1 && (int)dimlength[dimid[dimids[0]]] != 1) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
+                            if ((int)dimlength[dimid[dimids[1]]] != 3) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
                             if (typep != NC_DOUBLE) { return SAF_SOFA_ERROR_FORMAT_UNEXPECTED; }
                             
                             /*  Pull data */
@@ -1138,49 +1139,42 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                                 //if (h->nSources != -1 && h->nSources != (int)dimlength[dimid[dimids[0]]]) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
                                 if (h->nReceivers != -1 && h->nReceivers != (int)dimlength[dimid[dimids[1]]]) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
                                 if (h->nEmitters != -1 && h->nEmitters != (int)dimlength[dimid[dimids[3]]]) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
-                                
+
                                 h->nSources = (int)dimlength[dimid[dimids[0]]];
                                 h->nReceivers = (int)dimlength[dimid[dimids[1]]];
                                 h->DataLengthIR = (int)dimlength[dimid[dimids[2]]];
                                 h->nEmitters = (int)dimlength[dimid[dimids[3]]];
-                                
+
                                 /* Pull data */
-                                tmp_size = dimlength[dimid[dimids[0]]] * dimlength[dimid[dimids[1]]] * dimlength[dimid[dimids[2]]] * dimlength[dimid[dimids[3]]];  
+                                tmp_size = dimlength[dimid[dimids[0]]] * dimlength[dimid[dimids[1]]] * dimlength[dimid[dimids[2]]] * dimlength[dimid[dimids[3]]];
                                 tmp_size_reshaped = dimlength[dimid[dimids[0]]] * dimlength[dimid[dimids[1]]] * dimlength[dimid[dimids[3]]] * dimlength[dimid[dimids[2]]];
-                                
+
                                 tmp_data = realloc1d(tmp_data, tmp_size * sizeof(double));
                                 tmp_data_reshaped = realloc1d(tmp_data, tmp_size_reshaped * sizeof(double));
-                                
+
                                 nc_get_var(ncid, varid, tmp_data);
-                                
-                                // Reshape from [mRnE] to[mREn] for the sake of performance
-                                // 
-                                // forumla for pointer arithmetic of 4-dimensional c-arrays:
-                                // 
-                                // address = array_ptr + ((i * dim2 + j) * dim3 + k) * dim4 + l 
-                                // 
-                                // with i,j,k,l being the index variables and dim2,dim3,dim4 the length of every dimension.
-                                // array_ptr is the pointer to the whole array pointing to the array's first element.
-                                
-                                int m, r, n, e;
-                                for (m = 0; m < h->nSources; m++) {
-                                    for (r = 0; r < h->nReceivers; r++) {
-                                        for (n = 0; n < h->DataLengthIR; n++) {
-                                            for (e = 0; e < h->nEmitters; e++) {
-                                                /* get source and destination pointers with pointer arithmetic and the formular above */
-                                                double* sourcep = tmp_data + ((m * h->nReceivers + r) * h->DataLengthIR + n) * h->nEmitters + e; 
-                                                double* destp = tmp_data_reshaped + ((m * h->nReceivers + r) * h->nEmitters + e) * h->DataLengthIR + n;
-                                                
-                                                /* set the value of the destination pointer's address to the value of the source pointer's address */
-                                                destp = sourcep;
+
+                                // Reshape from [mRnE] to[mREn] for the sake of performance                                
+                                int n_m = h->nSources;
+                                int n_r = h->nReceivers;;
+                                int n_n = h->DataLengthIR;
+                                int n_e = h->nEmitters;
+
+                                for (int m = 0; m < n_m; m++) {
+                                    for (int r = 0; r < n_r; r++) {
+                                        for (int n = 0; n < n_n; n++) {
+                                            for (int e = 0; e < n_e; e++) {
+                                                int idxOld = m * n_r * n_n * n_e + r * n_n * n_e + n * n_e + e;
+                                                int idxNew = m * n_r * n_e * n_n + r * n_e * n_n + e * n_n + n;
+                                                tmp_data_reshaped[idxNew] = tmp_data[idxOld];
                                             }
                                         }
                                     }
                                 }
-                                
+
                                 h->DataIR = malloc1d(tmp_size * sizeof(float));
                                 for (i = 0; i < (int)tmp_size; i++)
-                                    h->DataIR[i] = (float)tmp_data_reshaped[i];          
+                                    h->DataIR[i] = (float)tmp_data_reshaped[i];
                             }
                             
                             
@@ -1229,7 +1223,7 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                             /* Checks */
                             if (!(ndimsp == 2 || ndimsp == 3)) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
                             if (h->nReceivers != -1 && !((int)dimlength[dimid[dimids[1]]] == h->nReceivers || (int)dimlength[dimid[dimids[0]]] == h->nReceivers)) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
-                            if ((int)dimlength[dimid[dimids[0]]] != 1 && (int)dimlength[dimid[dimids[1]]] != 1) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
+//                            if ((int)dimlength[dimid[dimids[0]]] != 1 && (int)dimlength[dimid[dimids[1]]] != 1) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
                             if (typep != NC_DOUBLE) { return SAF_SOFA_ERROR_FORMAT_UNEXPECTED; }
                             
                             /* Pull data */
