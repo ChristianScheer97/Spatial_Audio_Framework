@@ -214,22 +214,24 @@ void roombinauraliser_process
 
         /* Load time-domain data */
         for(i=0; i < SAF_MIN(nSources,nInputs); i++)
-            utility_svvcopy(inputs[i], roombinauraliser_FRAME_SIZE, pData->inputFrameTD[i]);
+            utility_svvcopy(inputs[i], roombinauraliser_FRAME_SIZE, pData->inputFrameTD[i]); // copy channel audio data to local buffer
         for(; i<nSources; i++)
-            memset(pData->inputFrameTD[i], 0, roombinauraliser_FRAME_SIZE * sizeof(float));
+            memset(pData->inputFrameTD[i], 0, roombinauraliser_FRAME_SIZE * sizeof(float)); // fill remaining channels with zeros because no emitter (source) exists for them
 
         /* Apply source gains */
-        for (ch = 0; ch < nSources; ch++) {
-            if(fabsf(pData->src_gains[ch] - 1.f) > 1e-6f)
-                utility_svsmul(pData->inputFrameTD[ch], &(pData->src_gains[ch]), roombinauraliser_FRAME_SIZE, NULL);
+        for (ch = 0; ch < nSources; ch++) { 
+            if(fabsf(pData->src_gains[ch] - 1.f) > 1e-6f) /* only apply gain if not unity */
+                utility_svsmul(pData->inputFrameTD[ch], &(pData->src_gains[ch]), roombinauraliser_FRAME_SIZE, NULL); 
         }
 
-        /* Apply time-frequency transform (TFT) */
+        /* Apply time-frequency transform (TFT) to all input and brir data */
         afSTFT_forward_knownDimensions(pData->hSTFT, pData->inputFrameTD, roombinauraliser_FRAME_SIZE, MAX_NUM_INPUTS, TIME_SLOTS, pData->inputframeTF);
 
         /* Rotate source directions */
         if(enableRotation && pData->recalc_M_rotFLAG){
             yawPitchRoll2Rzyx (pData->yaw, pData->pitch, pData->roll, pData->useRollPitchYawFlag, Rxyz);
+
+            /* TODO: müsste nur beim Laden machen*/
             for(i=0; i<nSources; i++){
                 pData->src_dirs_xyz[i][0] = cosf(DEG2RAD(pData->src_dirs_deg[i][1])) * cosf(DEG2RAD(pData->src_dirs_deg[i][0]));
                 pData->src_dirs_xyz[i][1] = cosf(DEG2RAD(pData->src_dirs_deg[i][1])) * sinf(DEG2RAD(pData->src_dirs_deg[i][0]));
@@ -240,6 +242,8 @@ void roombinauraliser_process
                         (float*)(pData->src_dirs_xyz), 3,
                         (float*)Rxyz, 3, 0.0f,
                         (float*)(pData->src_dirs_rot_xyz), 3);
+
+
             for(i=0; i<nSources; i++){
                 hypotxy = sqrtf(powf(pData->src_dirs_rot_xyz[i][0], 2.0f) + powf(pData->src_dirs_rot_xyz[i][1], 2.0f));
                 pData->src_dirs_rot_deg[i][0] = RAD2DEG(atan2f(pData->src_dirs_rot_xyz[i][1], pData->src_dirs_rot_xyz[i][0]));
@@ -250,7 +254,7 @@ void roombinauraliser_process
 
         /* interpolate hrtfs and apply to each source */
         memset(FLATTEN3D(pData->outputframeTF), 0, HYBRID_BANDS*NUM_EARS*TIME_SLOTS * sizeof(float_complex));
-        
+
         if(pData->recalc_hrtf_interpFLAG[0]){ /* FLAG unabhängig vom channel, rausnehmen*/
             if(enableRotation)
                 roombinauraliser_interpHRTFs(hBin, RAD2DEG(pData->yaw), RAD2DEG(pData->pitch), pData->hrtf_interp);

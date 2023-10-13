@@ -54,7 +54,7 @@ void roombinauraliser_interpHRTFs
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     int i, band;
     int aziIndex, elevIndex, N_azi, idx3d;
-    float_complex weights_cmplx[3], hrtf_fb3[pData->nSources][NUM_EARS][3];
+    float_complex weights_cmplx[3], hrtf_fb3[MAX_NUM_INPUTS][NUM_EARS][3];
     float aziRes, elevRes, weights[3];
     const float_complex calpha = cmplxf(1.0f, 0.0f), cbeta = cmplxf(0.0f, 0.0f);
      
@@ -76,8 +76,8 @@ void roombinauraliser_interpHRTFs
     for (int source=0; source < pData->nSources; source++){
         for (band = 0; band < HYBRID_BANDS; band++) {
             for (i = 0; i < 3; i++){
-                hrtf_fb3[source][0][i] = pData->hrtf_fb[band*NUM_EARS*(source+1)*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
-                hrtf_fb3[source][1][i] = pData->hrtf_fb[band*NUM_EARS*(source+1)*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
+                hrtf_fb3[source][0][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i] + source*(HYBRID_BANDS*NUM_EARS*(pData->N_hrir_dirs))];
+                hrtf_fb3[source][1][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i] + source*(HYBRID_BANDS*NUM_EARS*(pData->N_hrir_dirs))];
             }
             cblas_cgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, NUM_EARS, 1, 3, &calpha,
                         (float_complex*)hrtf_fb3[source], 3,
@@ -231,16 +231,17 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
 
     if (fabsf((elevation_min + 90) / (180) - (elevation_max + 90) / (180)) < 1e-6) /* dont criticize the normalize*/
         pData->VBAP_3d_FLAG = 0;
-
+   
     if (pData->VBAP_3d_FLAG) {
         generateVBAPgainTable3D(pData->hrir_dirs_deg, pData->N_hrir_dirs, pData->hrtf_vbapTableRes[0], pData->hrtf_vbapTableRes[1], 1, 0, 0.0f,
             &hrtf_vbap_gtable, &(pData->N_hrtf_vbap_gtable), &(pData->nTriangles));
     }
+
     else {
         generateVBAPgainTable2D(pData->hrir_dirs_deg, pData->N_hrir_dirs, pData->hrtf_vbapTableRes[0],
             &hrtf_vbap_gtable, &(pData->N_hrtf_vbap_gtable), &(pData->nTriangles));
     }
-
+    
     if(hrtf_vbap_gtable==NULL){
         /* if generating vbap gain tabled failed, re-calculate with default HRIR set */
         pData->useDefaultHRIRsFLAG = 1;
@@ -259,7 +260,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     pData->progressBar0_1 = 0.6f;
     pData->hrtf_fb = realloc1d(pData->hrtf_fb, HYBRID_BANDS * NUM_EARS * pData->nSources * (pData->N_hrir_dirs)*sizeof(float_complex));
     for (int source = 0; source < pData->nSources; source++)
-        HRIRs2HRTFs_afSTFT(pData->hrirs, pData->N_hrir_dirs, pData->hrir_runtime_len, HOP_SIZE, 0, 1, pData->hrtf_fb+source*(HYBRID_BANDS * NUM_EARS*(pData->N_hrir_dirs)));
+        HRIRs2HRTFs_afSTFT(pData->hrirs, pData->N_hrir_dirs, pData->hrir_runtime_len, HOP_SIZE, 0, 1, pData->hrtf_fb + source*(HYBRID_BANDS * NUM_EARS*(pData->N_hrir_dirs)));
 
     /* HRIR pre-processing */
     if(pData->enableHRIRsDiffuseEQ){
