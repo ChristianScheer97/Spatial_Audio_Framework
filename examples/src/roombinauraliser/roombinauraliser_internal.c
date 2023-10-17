@@ -76,8 +76,8 @@ void roombinauraliser_interpHRTFs
     for (int source=0; source < pData->nSources; source++){
         for (band = 0; band < HYBRID_BANDS; band++) {
             for (i = 0; i < 3; i++){
-                hrtf_fb3[source][0][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i] + source*(HYBRID_BANDS*NUM_EARS*(pData->N_hrir_dirs))];
-                hrtf_fb3[source][1][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i] + source*(HYBRID_BANDS*NUM_EARS*(pData->N_hrir_dirs))];
+                hrtf_fb3[source][0][i] = pData->hrtf_fb[source][band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
+                hrtf_fb3[source][1][i] = pData->hrtf_fb[source][band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
             }
             cblas_cgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, NUM_EARS, 1, 3, &calpha,
                         (float_complex*)hrtf_fb3[source], 3,
@@ -120,8 +120,15 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             pData->N_hrir_dirs = sofa.nSources;
             pData->nEmitters = sofa.nEmitters;
             pData->new_nSources = pData->nSources = sofa.nEmitters;
-            pData->hrirs = realloc1d(pData->hrirs, pData->N_hrir_dirs*NUM_EARS*pData->nSources*(pData->hrir_loaded_len)*sizeof(float));
-            memcpy(pData->hrirs, sofa.DataIR, pData->N_hrir_dirs*NUM_EARS*pData->nSources*(pData->hrir_loaded_len)*sizeof(float));
+            //pData->hrirs = realloc1d(pData->hrirs, pData->N_hrir_dirs*NUM_EARS*pData->nSources*(pData->hrir_loaded_len)*sizeof(float));
+            pData->hrirs = (float**)realloc2d((void**)pData->hrirs, pData->nSources, pData->N_hrir_dirs*NUM_EARS*(pData->hrir_loaded_len), sizeof(float));
+            
+            for(int cycle=0; cycle<pData->N_hrir_dirs*NUM_EARS; cycle++)
+                for(int source=0; source<pData->nSources; source++)
+                    memcpy(pData->hrirs[source]+pData->hrir_loaded_len*cycle,
+                           &sofa.DataIR[(cycle*pData->nSources+source)*pData->hrir_loaded_len],
+                           pData->hrir_loaded_len*sizeof(float));
+                
             pData->hrir_dirs_deg = realloc1d(pData->hrir_dirs_deg, pData->N_hrir_dirs*2*sizeof(float));
 
             cblas_scopy(pData->N_hrir_dirs, sofa.ListenerView, 3, pData->hrir_dirs_deg, 2); /* azi */
@@ -200,9 +207,12 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
         strcpy(pData->progressBarText,"Resampling the HRIRs");
         pData->progressBar0_1 = 0.5f;
         hrirs_resampled = NULL;
-        resampleHRIRs(pData->hrirs, pData->N_hrir_dirs, pData->hrir_loaded_len, pData->hrir_loaded_fs, pData->fs, 1, &hrirs_resampled, &new_len);
-        pData->hrirs = realloc1d(pData->hrirs, pData->N_hrir_dirs*NUM_EARS*new_len*sizeof(float));
-        cblas_scopy(pData->N_hrir_dirs*NUM_EARS*new_len, hrirs_resampled, 1, pData->hrirs, 1);
+        for(int source=0; source<pData->nSources; source++)
+            resampleHRIRs(pData->hrirs[source], pData->N_hrir_dirs, pData->hrir_loaded_len, pData->hrir_loaded_fs, pData->fs, 1, &hrirs_resampled+source*(pData->N_hrir_dirs*NUM_EARS*new_len), &new_len);
+        pData->hrirs = (float**)realloc2d((void**)pData->hrirs, pData->nSources, pData->N_hrir_dirs*NUM_EARS*new_len,sizeof(float));
+        for(int source=0; source<pData->nSources; source++)
+            cblas_scopy(pData->N_hrir_dirs*NUM_EARS*new_len, hrirs_resampled+pData->N_hrir_dirs*NUM_EARS*new_len, 1, pData->hrirs[source], 1);
+        
         free(hrirs_resampled);
         pData->hrir_runtime_fs = pData->fs;
         pData->hrir_runtime_len = new_len;
@@ -258,9 +268,10 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     
     /* convert hrirs to filterbank coefficients */
     pData->progressBar0_1 = 0.6f;
-    pData->hrtf_fb = realloc1d(pData->hrtf_fb, HYBRID_BANDS * NUM_EARS * pData->nSources * (pData->N_hrir_dirs)*sizeof(float_complex));
-    for (int source = 0; source < pData->nSources; source++)
-        HRIRs2HRTFs_afSTFT(pData->hrirs, pData->N_hrir_dirs, pData->hrir_runtime_len, HOP_SIZE, 0, 1, pData->hrtf_fb + source*(HYBRID_BANDS * NUM_EARS*(pData->N_hrir_dirs)));
+    //pData->hrtf_fb = realloc1d(pData->hrtf_fb, HYBRID_BANDS * NUM_EARS * pData->nSources * (pData->N_hrir_dirs)*sizeof(float_complex));
+    pData->hrtf_fb = (float_complex**)realloc2d((void**)pData->hrtf_fb, pData->nSources, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs), sizeof(float_complex));
+    for(int source = 0; source < pData->nSources; source++)
+        HRIRs2HRTFs_afSTFT(pData->hrirs[source], pData->N_hrir_dirs, pData->hrir_runtime_len, HOP_SIZE, 0, 1, pData->hrtf_fb[source]);
 
     /* HRIR pre-processing */
     if(pData->enableHRIRsDiffuseEQ){
@@ -281,13 +292,15 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             for(int idx=0; idx < pData->N_hrir_dirs; idx++)
                 pData->weights[idx] = 4.f*SAF_PI / (float)pData->N_hrir_dirs;
         }
-        diffuseFieldEqualiseHRTFs(pData->N_hrir_dirs, pData->itds_s, pData->freqVector, HYBRID_BANDS, pData->weights, 1, 0, pData->hrtf_fb);
+        for (int source = 0; source < pData->nSources; source++)
+            diffuseFieldEqualiseHRTFs(pData->N_hrir_dirs, pData->itds_s, pData->freqVector, HYBRID_BANDS, pData->weights, 1, 0, pData->hrtf_fb[source]);
     }
 
     /* calculate magnitude responses */
-    pData->hrtf_fb_mag = realloc1d(pData->hrtf_fb_mag, HYBRID_BANDS*NUM_EARS*(pData->N_hrir_dirs)*sizeof(float)); 
-    for(i=0; i<HYBRID_BANDS*NUM_EARS* (pData->N_hrir_dirs); i++)
-        pData->hrtf_fb_mag[i] = cabsf(pData->hrtf_fb[i]);
+    pData->hrtf_fb_mag = (float**)realloc2d((void**)pData->hrtf_fb_mag, pData->nSources, HYBRID_BANDS*NUM_EARS*(pData->N_hrir_dirs), sizeof(float)); 
+    for(int source = 0; source < pData->nSources; source++)
+        for(i=0; i<HYBRID_BANDS*NUM_EARS* (pData->N_hrir_dirs); i++)
+            pData->hrtf_fb_mag[source][i] = cabsf(pData->hrtf_fb[source][i]);
 
     /* The HRTFs should be re-interpolated */
     for(i=0; i<MAX_NUM_INPUTS; i++)
