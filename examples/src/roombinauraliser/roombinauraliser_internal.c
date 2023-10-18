@@ -76,8 +76,8 @@ void roombinauraliser_interpHRTFs
     for (int source=0; source < pData->nSources; source++){
         for (band = 0; band < HYBRID_BANDS; band++) {
             for (i = 0; i < 3; i++){
-                hrtf_fb3[source][0][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i] + source*(HYBRID_BANDS*NUM_EARS*(pData->N_hrir_dirs))];
-                hrtf_fb3[source][1][i] = pData->hrtf_fb[band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i] + source*(HYBRID_BANDS*NUM_EARS*(pData->N_hrir_dirs))];
+                hrtf_fb3[source][0][i] = pData->hrtf_fb[(source+1)*band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
+                hrtf_fb3[source][1][i] = pData->hrtf_fb[(source+1)*band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
             }
             cblas_cgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, NUM_EARS, 1, 3, &calpha,
                         (float_complex*)hrtf_fb3[source], 3,
@@ -145,7 +145,8 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             }
             else {
                 /* spherical coordinates */
-                for (int i=0; i<sofa.nEmitters; i++){
+                for (int i=0; i<sofa.nEmitters; i++) {
+
                     if (sofa.EmitterPosition[3*i+0] > 180)
                         pData->src_dirs_deg[i][0] = sofa.EmitterPosition[3*i+0] - 360.0;
                     else if (sofa.EmitterPosition[3*i+0] < -180)

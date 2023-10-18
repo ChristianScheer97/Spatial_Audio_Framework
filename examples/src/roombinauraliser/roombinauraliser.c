@@ -209,7 +209,7 @@ void roombinauraliser_process
     //nEmitters = pData->nEmitters;
     
     /* apply binaural panner */
-    if ((nSamples == roombinauraliser_FRAME_SIZE) && (pData->hrtf_fb!=NULL) && (pData->codecStatus==CODEC_STATUS_INITIALISED) ){
+    if ((nSamples == roombinauraliser_FRAME_SIZE) && (pData->hrtf_fb!=NULL) && (pData->codecStatus==CODEC_STATUS_INITIALISED) ) {
         pData->procStatus = PROC_STATUS_ONGOING;
 
         /* Load time-domain data */
@@ -231,19 +231,12 @@ void roombinauraliser_process
         if(enableRotation && pData->recalc_M_rotFLAG){
             yawPitchRoll2Rzyx (pData->yaw, pData->pitch, pData->roll, pData->useRollPitchYawFlag, Rxyz);
 
-            /* TODO: müsste nur beim Laden machen*/
-            for(i=0; i<nSources; i++){
-                pData->src_dirs_xyz[i][0] = cosf(DEG2RAD(pData->src_dirs_deg[i][1])) * cosf(DEG2RAD(pData->src_dirs_deg[i][0]));
-                pData->src_dirs_xyz[i][1] = cosf(DEG2RAD(pData->src_dirs_deg[i][1])) * sinf(DEG2RAD(pData->src_dirs_deg[i][0]));
-                pData->src_dirs_xyz[i][2] = sinf(DEG2RAD(pData->src_dirs_deg[i][1]));
-            }
-                pData->recalc_hrtf_interpFLAG = 1;
+            pData->recalc_hrtf_interpFLAG = 1;
             
             cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nSources, 3, 3, 1.0f,
                         (float*)(pData->src_dirs_xyz), 3,
                         (float*)Rxyz, 3, 0.0f,
                         (float*)(pData->src_dirs_rot_xyz), 3);
-
 
             for(i=0; i<nSources; i++){
                 hypotxy = sqrtf(powf(pData->src_dirs_rot_xyz[i][0], 2.0f) + powf(pData->src_dirs_rot_xyz[i][1], 2.0f));
@@ -258,9 +251,9 @@ void roombinauraliser_process
         
         if(pData->recalc_hrtf_interpFLAG){
             if(enableRotation)
-                roombinauraliser_interpHRTFs(hBin, RAD2DEG(pData->yaw), RAD2DEG(pData->pitch), pData->hrtf_interp);
+                roombinauraliser_interpHRTFs(hBin, pData->src_dirs_rot_deg[0][0], pData->src_dirs_rot_deg[0][1], pData->hrtf_interp);
             else
-                roombinauraliser_interpHRTFs(hBin, 0, 0, pData->hrtf_interp);
+                roombinauraliser_interpHRTFs(hBin, pData->src_dirs_deg[0][0], pData->src_dirs_deg[0][1], pData->hrtf_interp);
             pData->recalc_hrtf_interpFLAG = 0;
         }
         
