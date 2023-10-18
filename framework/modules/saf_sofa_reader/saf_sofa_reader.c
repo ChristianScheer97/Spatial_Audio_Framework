@@ -1156,7 +1156,7 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
 
                                 // Reshape from [mRnE] to[mREn] for the sake of performance                                
                                 int n_m = h->nSources;
-                                int n_r = h->nReceivers;;
+                                int n_r = h->nReceivers;
                                 int n_n = h->DataLengthIR;
                                 int n_e = h->nEmitters;
 

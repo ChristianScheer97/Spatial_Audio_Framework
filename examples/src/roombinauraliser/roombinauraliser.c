@@ -230,9 +230,13 @@ void roombinauraliser_process
         /* Rotate source directions */
         if(enableRotation && pData->recalc_M_rotFLAG){
             yawPitchRoll2Rzyx (pData->yaw, pData->pitch, pData->roll, pData->useRollPitchYawFlag, Rxyz);
-
             pData->recalc_hrtf_interpFLAG = 1;
-            
+            for (int i=0; i<pData->nSources; i++) {
+                pData->src_dirs_xyz[i][0] = 1.0f;
+                pData->src_dirs_xyz[i][1] = 0.0f;
+                pData->src_dirs_xyz[i][2] = 0.0f;
+                
+            }
             cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nSources, 3, 3, 1.0f,
                         (float*)(pData->src_dirs_xyz), 3,
                         (float*)Rxyz, 3, 0.0f,

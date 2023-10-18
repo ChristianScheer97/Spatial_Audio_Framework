@@ -84,7 +84,7 @@ typedef struct _roombinauraliser
     
     /* sofa file info */
     char* sofa_filepath;             /**< absolute/relevative file path for a sofa file */
-    float* hrirs;                    /**< time domain HRIRs; FLAT: N_hrir_dirs x #NUM_EARS x hrir_len */
+    float** hrirs;                    /**< time domain HRIRs; FLAT: N_hrir_dirs x #NUM_EARS x hrir_len */
     float* hrir_dirs_deg;            /**< directions of the HRIRs in degrees [azi elev]; FLAT: N_hrir_dirs x 2 */
     int N_hrir_dirs;                 /**< number of HRIR directions in the current sofa file */
     int hrir_loaded_len;             /**< length of the loaded HRIRs, in samples */
@@ -101,8 +101,8 @@ typedef struct _roombinauraliser
     
     /* hrir filterbank coefficients */
     float* itds_s;                   /**< interaural-time differences for each HRIR (in seconds); nBands x 1 */
-    float_complex* hrtf_fb;          /**< hrtf filterbank coefficients; nBands x nCH x N_hrirs */
-    float* hrtf_fb_mag;              /**< magnitudes of the hrtf filterbank coefficients; nBands x nCH x N_hrirs */
+    float_complex** hrtf_fb;          /**< hrtf filterbank coefficients; nBands x nCH x N_hrirs */
+    float** hrtf_fb_mag;              /**< magnitudes of the hrtf filterbank coefficients; nBands x nCH x N_hrirs */
     float_complex hrtf_interp[MAX_NUM_INPUTS][HYBRID_BANDS][NUM_EARS]; /**< Interpolated HRTFs */
     
     /* flags/status */
