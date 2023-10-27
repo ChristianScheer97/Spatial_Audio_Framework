@@ -79,7 +79,9 @@ void roombinauraliser_create
     /* HRTF filterbank coefficients */
     pData->itds_s = NULL;
     pData->hrtf_fb = NULL;
+    //pData->hrtf_fb_default = NULL;
     pData->hrtf_fb_mag = NULL;
+    //pData->hrtf_fb_mag_default = NULL;
 
     /* flags/status */
     pData->progressBar0_1 = 0.0f;
