@@ -37,7 +37,7 @@
 #include "saf.h"           /* Main include header for SAF */
 #include "saf_externals.h" /* To also include SAF dependencies (cblas etc.) */
 #include "netcdf.h"        /* Include NetCDF*/
-#include " ../../../modules/saf_sofa_reader/libmysofa/internal/mysofa_internal.h"
+//#include " ../../../modules/saf_sofa_reader/libmysofa/internal/mysofa_internal.h"
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus */

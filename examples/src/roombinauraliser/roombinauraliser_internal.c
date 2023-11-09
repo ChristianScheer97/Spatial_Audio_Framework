@@ -189,9 +189,19 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
         pData->hrir_loaded_len = __default_hrir_len;
         pData->N_hrir_dirs = __default_N_hrir_dirs;
 
-        pData->hrirs = (float**)realloc2d((void**)pData->hrirs, 1, pData->N_hrir_dirs * (pData->hrir_loaded_len), sizeof(float));
-        cblas_scopy(pData->N_hrir_dirs * NUM_EARS * new_len, hrirs_resampled + pData->N_hrir_dirs * NUM_EARS * new_len, 1, 0, 1);
-
+        pData->hrirs = (float**)realloc2d((void**)pData->hrirs, 2, pData->N_hrir_dirs *2* (pData->hrir_loaded_len), sizeof(float));
+        cblas_scopy(pData->N_hrir_dirs * NUM_EARS * pData->hrir_loaded_len, (float*)__default_hrirs, 1, pData->hrirs[0], 1);
+        cblas_scopy(pData->N_hrir_dirs * NUM_EARS * pData->hrir_loaded_len, (float*)__default_hrirs, 1, pData->hrirs[1], 1);
+        pData->new_nSources = pData->nSources = 2;
+        pData->src_dirs_xyz[0][0] = pData->src_dirs_xyz[1][0] = 2;
+        pData->src_dirs_xyz[0][1] = pData->src_dirs_xyz[1][1] = 2;
+        pData->src_dirs_xyz[0][2] = pData->src_dirs_xyz[1][2] = 0;
+        pData->src_dirs_deg[0][0] = 33;
+        pData->src_dirs_deg[1][0] = -33;
+        pData->src_dirs_deg[0][1] = 0;
+        pData->src_dirs_deg[1][1] = 0;
+        
+        //memcpy(pData->hrirs[0], (float*)__default_hrirs, pData->N_hrir_dirs*NUM_EARS*(pData->hrir_loaded_len)*sizeof(float));
         pData->hrir_dirs_deg = realloc1d(pData->hrir_dirs_deg, pData->N_hrir_dirs*2*sizeof(float));
         memcpy(pData->hrir_dirs_deg, (float*)__default_hrir_dirs_deg, pData->N_hrir_dirs*2*sizeof(float));
 
@@ -274,8 +284,9 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     /* convert hrirs to filterbank coefficients */
     pData->progressBar0_1 = 0.6f;
     if (pData->useDefaultHRIRsFLAG) {
-        pData->hrtf_fb = (float_complex**)realloc2d((void**)pData->hrtf_fb, 1, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs), sizeof(float_complex));
+        pData->hrtf_fb = (float_complex**)realloc2d((void**)pData->hrtf_fb, 2, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs), sizeof(float_complex));
         HRIRs2HRTFs_afSTFT(pData->hrirs[0], pData->N_hrir_dirs, pData->hrir_runtime_len, HOP_SIZE, 0, 1, pData->hrtf_fb[0]);
+        HRIRs2HRTFs_afSTFT(pData->hrirs[1], pData->N_hrir_dirs, pData->hrir_runtime_len, HOP_SIZE, 0, 1, pData->hrtf_fb[1]);
 
     }
     else {
@@ -311,7 +322,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     if (pData->useDefaultHRIRsFLAG) {
         pData->hrtf_fb_mag = (float**)realloc2d((void**)pData->hrtf_fb_mag, pData->nSources, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs), sizeof(float));
         for (i = 0; i < HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs); i++)
-            pData->hrtf_fb_mag[0][i] = cabsf(pData->hrtf_fb[][i]);
+            pData->hrtf_fb_mag[0][i] = cabsf(pData->hrtf_fb[0][i]);
 
     }
     else {
