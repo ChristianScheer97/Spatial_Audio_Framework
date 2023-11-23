@@ -91,7 +91,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     int i, new_len;
-    float* hrtf_vbap_gtable, *hrirs_resampled;//, *hrir_dirs_rad;
+    float* hrtf_vbap_gtable, **hrirs_resampled, *resample;//, *hrir_dirs_rad;
 #ifdef SAF_ENABLE_SOFA_READER_MODULE
     SAF_SOFA_ERROR_CODES error;
     saf_sofa_container sofa;
@@ -121,7 +121,8 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             pData->nEmitters = sofa.nEmitters;
             pData->new_nSources = pData->nSources = sofa.nEmitters;
             //pData->hrirs = realloc1d(pData->hrirs, pData->N_hrir_dirs*NUM_EARS*pData->nSources*(pData->hrir_loaded_len)*sizeof(float));
-            pData->hrirs = (float**)realloc2d((void**)pData->hrirs, pData->nSources, pData->N_hrir_dirs*NUM_EARS*(pData->hrir_loaded_len), sizeof(float));
+            //pData->hrirs = NULL;
+            pData->hrirs = (float**)malloc2d(pData->nSources, pData->N_hrir_dirs*NUM_EARS*(pData->hrir_loaded_len), sizeof(float));
             
             for(int cycle=0; cycle<pData->N_hrir_dirs*NUM_EARS; cycle++)
                 for(int source=0; source<pData->nSources; source++)
@@ -219,16 +220,25 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
 
     /* Resample the HRIRs if needed */
     if(pData->hrir_loaded_fs!=pData->fs){
-        strcpy(pData->progressBarText,"Resampling the HRIRs");
-        pData->progressBar0_1 = 0.5f;
         hrirs_resampled = NULL;
-        for(int source=0; source<pData->nSources; source++)
-            resampleHRIRs(pData->hrirs[source], pData->N_hrir_dirs, pData->hrir_loaded_len, pData->hrir_loaded_fs, pData->fs, 1, &hrirs_resampled+source*(pData->N_hrir_dirs*NUM_EARS*new_len), &new_len);
-        pData->hrirs = (float**)realloc2d((void**)pData->hrirs, pData->nSources, pData->N_hrir_dirs*NUM_EARS*new_len,sizeof(float));
-        for(int source=0; source<pData->nSources; source++)
-            cblas_scopy(pData->N_hrir_dirs*NUM_EARS*new_len, hrirs_resampled+pData->N_hrir_dirs*NUM_EARS*new_len, 1, pData->hrirs[source], 1);
+        resample = NULL;
+        for(int source=0; source<pData->nSources; source++){
+            char buffer[64];
+            snprintf(buffer, sizeof(buffer), "Resampling the HRIRs (%d/%d)",source+1, pData->nSources);
+            strcpy(pData->progressBarText, buffer);
+            pData->progressBar0_1 = 0.5f+0.1f*(source)/pData->nSources;
+            resampleHRIRs(pData->hrirs[source], pData->N_hrir_dirs, pData->hrir_loaded_len, pData->hrir_loaded_fs, pData->fs, 1, &resample, &new_len);
+            if (source==0)
+                hrirs_resampled = (float**)realloc2d((void**)hrirs_resampled, pData->nSources, pData->N_hrir_dirs*NUM_EARS*new_len,sizeof(float));
+            hrirs_resampled[source] = resample;
+        }
+        pData->hrirs = (float**)realloc2d((void**)pData->hrirs, pData->nSources, pData->N_hrir_dirs*NUM_EARS*new_len, sizeof(float));
+        for (int source=0; source<pData->nSources; source++)
+            memcpy(pData->hrirs[source], hrirs_resampled[source], pData->N_hrir_dirs*NUM_EARS*new_len*sizeof(float));
         
+        free(resample);
         free(hrirs_resampled);
+        
         pData->hrir_runtime_fs = pData->fs;
         pData->hrir_runtime_len = new_len;
     }
