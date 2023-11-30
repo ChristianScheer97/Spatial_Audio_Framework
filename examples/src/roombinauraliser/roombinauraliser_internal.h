@@ -100,7 +100,7 @@ typedef struct _roombinauraliser
     float* hrtf_vbap_gtableComp;     /**< N_hrtf_vbap_gtable x 3 */
     
     /* hrir filterbank coefficients */
-    float* itds_s;                   /**< interaural-time differences for each HRIR (in seconds); nBands x 1 */
+    float** itds_s;                  /**< interaural-time differences for each HRIR (in seconds); nSources x nBands x 1 */
     float_complex** hrtf_fb;         /**< hrtf filterbank coefficients; nBands x nCH x N_hrirs */
     float** hrtf_fb_mag;             /**< magnitudes of the hrtf filterbank coefficients; nBands x nCH x N_hrirs */
     float_complex hrtf_interp[MAX_NUM_INPUTS][HYBRID_BANDS][NUM_EARS]; /**< Interpolated HRTFs */
@@ -109,6 +109,7 @@ typedef struct _roombinauraliser
     CODEC_STATUS codecStatus;        /**< see #CODEC_STATUS */
     float progressBar0_1;            /**< Current (re)initialisation progress, between [0..1] */
     char* progressBarText;           /**< Current (re)initialisation step, string */
+    char* progressBarTooltip;        /**< Tooltip for current (re)initialisation step, string */
     PROC_STATUS procStatus;          /**< see #PROC_STATUS */
     int recalc_hrtf_interpFLAG; /**< 1: re-calculate/interpolate the HRTF, 0: do not */
     int reInitHRTFsAndGainTables;    /**< 1: reinitialise the HRTFs and interpolation tables, 0: do not */

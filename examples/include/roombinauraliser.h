@@ -258,7 +258,7 @@ float roombinauraliser_getProgressBar0_1(void* const hBin);
  * @note "text" string should be (at least) of length:
  *       #PROGRESSBARTEXT_CHAR_LENGTH
  */
-void roombinauraliser_getProgressBarText(void* const hBin, char* text);
+void roombinauraliser_getProgressBarText(void* const hBin, char* text, char* tooltip);
 
 /** Returns the source azimuth for a given index, in DEGREES */
 float roombinauraliser_getSourceAzi_deg(void* const hBin, int index);

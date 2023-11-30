@@ -86,7 +86,9 @@ void roombinauraliser_create
     /* flags/status */
     pData->progressBar0_1 = 0.0f;
     pData->progressBarText = malloc1d(PROGRESSBARTEXT_CHAR_LENGTH*sizeof(char));
+    pData->progressBarTooltip = malloc1d(PROGRESSBARTEXT_CHAR_LENGTH*sizeof(char));
     strcpy(pData->progressBarText,"");
+    strcpy(pData->progressBarTooltip, "");
     pData->codecStatus = CODEC_STATUS_NOT_INITIALISED;
     pData->procStatus = PROC_STATUS_NOT_ONGOING;
     pData->reInitHRTFsAndGainTables = 1;
@@ -128,7 +130,7 @@ void roombinauraliser_destroy
         free(pData->hrir_dirs_deg);
         free(pData->weights);
         free(pData->progressBarText);
-         
+        free(pData->progressBarTooltip);
         free(pData);
         pData = NULL;
     }
@@ -185,6 +187,7 @@ void roombinauraliser_initCodec
     
     /* done! */
     strcpy(pData->progressBarText,"Done!");
+    strcpy(pData->progressBarTooltip,"Setup completed, ready for processing.");
     pData->progressBar0_1 = 1.0f;
     pData->codecStatus = CODEC_STATUS_INITIALISED;
     
@@ -509,10 +512,11 @@ float roombinauraliser_getProgressBar0_1(void* const hBin)
     return pData->progressBar0_1;
 }
 
-void roombinauraliser_getProgressBarText(void* const hBin, char* text)
+void roombinauraliser_getProgressBarText(void* const hBin, char* text, char* tooltip)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     memcpy(text, pData->progressBarText, PROGRESSBARTEXT_CHAR_LENGTH*sizeof(char));
+    memcpy(tooltip, pData->progressBarTooltip, PROGRESSBARTEXT_CHAR_LENGTH*sizeof(char));
 }
 
 float roombinauraliser_getSourceAzi_deg(void* const hBin, int index)
