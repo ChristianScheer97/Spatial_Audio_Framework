@@ -187,7 +187,7 @@ void roombinauraliser_initCodec
     
     /* done! */
     strcpy(pData->progressBarText,"Done!");
-    strcpy(pData->progressBarTooltip,"Setup completed, ready for processing.");
+    strcpy(pData->progressBarTooltip,"Setup complete, ready for processing.");
     pData->progressBar0_1 = 1.0f;
     pData->codecStatus = CODEC_STATUS_INITIALISED;
     

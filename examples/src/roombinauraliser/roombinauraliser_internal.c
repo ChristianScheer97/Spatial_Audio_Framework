@@ -216,6 +216,8 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
 
     /* estimate the ITDs for each HRIR */
     strcpy(pData->progressBarText,"Estimating ITDs");
+    strcpy(pData->progressBarTooltip,"Calculating time difference between both ears for all sources and directions");
+
     pData->progressBar0_1 = 0.4f;
     pData->itds_s = (float**)realloc2d((void**)pData->itds_s, pData->nSources, pData->N_hrir_dirs, sizeof(float));
 
@@ -241,7 +243,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
         resample = NULL;
         for(int source=0; source<pData->nSources; source++){
             char buffer[PROGRESSBARTEXT_CHAR_LENGTH];
-            snprintf(buffer, sizeof(buffer), "Resampling the HRIRs (%d/%d)",source+1, pData->nSources);
+            snprintf(buffer, sizeof(buffer), "Resampling the BRIRs (%d/%d)",source+1, pData->nSources);
             strcpy(pData->progressBarText, buffer);
             strcpy(pData->progressBarTooltip, "Resampling the impulse responses to match the DAW's sampling rate. This may take some time...");
             pData->progressBar0_1 = 0.5f+0.1f*(source)/pData->nSources;
@@ -267,7 +269,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     
     /* generate VBAP gain table */
     strcpy(pData->progressBarText,"Generating interpolation table");
-    strcpy(pData->progressBarTooltip,"Calculing VBAP weights and filterbank coefficients");
+    strcpy(pData->progressBarTooltip,"Calculating VBAP weights and filterbank coefficients");
     pData->progressBar0_1 = 0.6f;
     hrtf_vbap_gtable = NULL;
     pData->hrtf_vbapTableRes[0] = 2;
@@ -325,32 +327,33 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     }
 
     /* HRIR pre-processing */
-    if(!pData->enableHRIRsDiffuseEQ){
-            /* get integration weights */
-            strcpy(pData->progressBarText,"Applying HRIR diffuse-field EQ");
-            pData->progressBar0_1 = 0.9f;
-            if(pData->N_hrir_dirs<=3600){
-                pData->weights = realloc1d(pData->weights, pData->N_hrir_dirs*sizeof(float));
-                float * hrir_dirs_rad = (float*) malloc1d(pData->N_hrir_dirs*2*sizeof(float));
-                memcpy(hrir_dirs_rad, pData->hrir_dirs_deg, pData->N_hrir_dirs*2*sizeof(float));
-                cblas_sscal(pData->N_hrir_dirs*2, SAF_PI/180.f, hrir_dirs_rad, 1);
-                sphElev2incl(hrir_dirs_rad, pData->N_hrir_dirs, 0, hrir_dirs_rad);
-                //for (int i=0; i<pData->N_hrir_dirs; i++)
-                //    printf("%.3f, %.3f \n", hrir_dirs_rad[2*i], hrir_dirs_rad[2*i+1]);
-                int supOrder = calculateGridWeights(hrir_dirs_rad, pData->N_hrir_dirs, -1, pData->weights);
-                if(supOrder < 1){
-                    saf_print_warning("Could not calculate grid weights");
-                    free(pData->weights);
-                    pData->weights = NULL;
-                }
-            }
-            else{
-                saf_print_warning("Too many grid points to calculate grid weights. i.e., we're not assuming that the HRTF measurement grid was uniform.");
+    if(pData->enableHRIRsDiffuseEQ){
+        /* get integration weights */
+        strcpy(pData->progressBarText,"Applying BRIR diffuse-field EQ");
+        strcpy(pData->progressBarTooltip,"Applying BRIR diffuse-field EQ");
+        pData->progressBar0_1 = 0.9f;
+        if(pData->N_hrir_dirs<=3600){
+            pData->weights = realloc1d(pData->weights, pData->N_hrir_dirs*sizeof(float));
+            float * hrir_dirs_rad = (float*) malloc1d(pData->N_hrir_dirs*2*sizeof(float));
+            memcpy(hrir_dirs_rad, pData->hrir_dirs_deg, pData->N_hrir_dirs*2*sizeof(float));
+            cblas_sscal(pData->N_hrir_dirs*2, SAF_PI/180.f, hrir_dirs_rad, 1);
+            sphElev2incl(hrir_dirs_rad, pData->N_hrir_dirs, 0, hrir_dirs_rad);
+            //for (int i=0; i<pData->N_hrir_dirs; i++)
+            //    printf("%.3f, %.3f \n", hrir_dirs_rad[2*i], hrir_dirs_rad[2*i+1]);
+            int supOrder = calculateGridWeights(hrir_dirs_rad, pData->N_hrir_dirs, -1, pData->weights);
+            if(supOrder < 1){
+                saf_print_warning("Could not calculate grid weights");
                 free(pData->weights);
                 pData->weights = NULL;
             }
-        for (int source = 0; source < pData->nSources; source++)
-            diffuseFieldEqualiseHRTFs(pData->N_hrir_dirs, pData->itds_s[source], pData->freqVector, HYBRID_BANDS, pData->weights, 1, 0, pData->hrtf_fb[source]);
+        }
+        else{
+            saf_print_warning("Too many grid points to calculate grid weights. i.e., we're not assuming that the HRTF measurement grid was uniform.");
+            free(pData->weights);
+            pData->weights = NULL;
+        }
+    for (int source = 0; source < pData->nSources; source++)
+        diffuseFieldEqualiseHRTFs(pData->N_hrir_dirs, pData->itds_s[source], pData->freqVector, HYBRID_BANDS, pData->weights, 1, 0, pData->hrtf_fb[source]);
     }
 
     /* calculate magnitude responses */
