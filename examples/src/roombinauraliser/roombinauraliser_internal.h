@@ -111,7 +111,7 @@ typedef struct _roombinauraliser
     char* progressBarText;           /**< Current (re)initialisation step, string */
     char* progressBarTooltip;        /**< Tooltip for current (re)initialisation step, string */
     PROC_STATUS procStatus;          /**< see #PROC_STATUS */
-    int recalc_hrtf_interpFLAG; /**< 1: re-calculate/interpolate the HRTF, 0: do not */
+    int recalc_hrtf_interpFLAG;      /**< 1: re-calculate/interpolate the HRTF, 0: do not */
     int reInitHRTFsAndGainTables;    /**< 1: reinitialise the HRTFs and interpolation tables, 0: do not */
     int recalc_M_rotFLAG;            /**< 1: re-calculate the rotation matrix, 0: do not */
     int VBAP_3d_FLAG;                /**< 1: VBAP in 3 Dimensions, 0: VBAP in 2 Dimensions */
@@ -127,6 +127,7 @@ typedef struct _roombinauraliser
     int nSources;                            /**< Current number of input/source signals */
     int nEmitters;
     float src_dirs_deg[MAX_NUM_INPUTS][2];   /**< Current source/panning directions, in degrees */
+    INTERP_MODES interpMode;                 /**< see #INTERP_MODES */
     int useDefaultHRIRsFLAG;                 /**< 1: use default HRIRs in database, 0: use those from SOFA file */
     int enableHRIRsDiffuseEQ;                /**< flag to diffuse-field equalisation to the currently loaded HRTFs */
     int enableRotation;                      /**< 1: enable rotation, 0: disable */
@@ -164,6 +165,7 @@ void roombinauraliser_setCodecStatus(void* const hBin,
  * @param[out] h_intrp       Interpolated HRTF
  */
 void roombinauraliser_interpHRTFs(void* const hBin,
+                              INTERP_MODES mode,
                               float azimuth_deg,
                               float elevation_deg,
                               float_complex h_intrp[MAX_NUM_INPUTS][HYBRID_BANDS][NUM_EARS]);

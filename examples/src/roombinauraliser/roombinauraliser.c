@@ -46,6 +46,7 @@ void roombinauraliser_create
     pData->useDefaultHRIRsFLAG = 1; /* pars->sofa_filepath must be valid to set this to 0 */
     pData->enableHRIRsDiffuseEQ = 0;
     pData->nSources = pData->new_nSources;
+    pData->interpMode = INTERP_TRI_PS;
     pData->nEmitters = 0;
     pData->yaw = 0.0f;
     pData->pitch = 0.0f;
@@ -92,11 +93,11 @@ void roombinauraliser_create
     pData->codecStatus = CODEC_STATUS_NOT_INITIALISED;
     pData->procStatus = PROC_STATUS_NOT_ONGOING;
     pData->reInitHRTFsAndGainTables = 1;
+    pData->recalc_hrtf_interpFLAG = 1;
+    pData->recalc_M_rotFLAG = 1;
     for(ch=0; ch<MAX_NUM_INPUTS; ch++) {
-        pData->recalc_hrtf_interpFLAG = 1;
         pData->src_gains[ch] = 1.f;
     }
-    pData->recalc_M_rotFLAG = 1; 
 }
 
 void roombinauraliser_destroy
@@ -260,9 +261,9 @@ void roombinauraliser_process
         
         if(pData->recalc_hrtf_interpFLAG){
             if(enableRotation)
-                roombinauraliser_interpHRTFs(hBin, pData->src_dirs_rot_deg[0][0], pData->src_dirs_rot_deg[0][1], pData->hrtf_interp);
+                roombinauraliser_interpHRTFs(hBin, pData->interpMode, pData->src_dirs_rot_deg[0][0], pData->src_dirs_rot_deg[0][1], pData->hrtf_interp);
             else
-                roombinauraliser_interpHRTFs(hBin, pData->src_dirs_deg[0][0], pData->src_dirs_deg[0][1], pData->hrtf_interp);
+                roombinauraliser_interpHRTFs(hBin, pData->interpMode, pData->src_dirs_deg[0][0], pData->src_dirs_deg[0][1], pData->hrtf_interp);
             pData->recalc_hrtf_interpFLAG = 0;
         }
         
@@ -298,10 +299,8 @@ void roombinauraliser_process
 void roombinauraliser_refreshSettings(void* const hBin)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    int ch;
     pData->reInitHRTFsAndGainTables = 1;
-    for(ch=0; ch<MAX_NUM_INPUTS; ch++)
-        pData->recalc_hrtf_interpFLAG = 1;
+    pData->recalc_hrtf_interpFLAG = 1;
     roombinauraliser_setCodecStatus(hBin, CODEC_STATUS_NOT_INITIALISED);
 }
 
@@ -351,7 +350,6 @@ void roombinauraliser_setUseDefaultHRIRsflag(void* const hBin, int newState)
 void roombinauraliser_setSofaFilePath(void* const hBin, const char* path)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    
     pData->sofa_filepath = realloc1d(pData->sofa_filepath, strlen(path) + 1);
     strcpy(pData->sofa_filepath, path);
     pData->useDefaultHRIRsFLAG = 0;
@@ -361,10 +359,8 @@ void roombinauraliser_setSofaFilePath(void* const hBin, const char* path)
 void roombinauraliser_setEnableHRIRsDiffuseEQ(void* const hBin, int newState)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    if(newState!=pData->enableHRIRsDiffuseEQ){
-        pData->enableHRIRsDiffuseEQ = newState;
-        roombinauraliser_refreshSettings(hBin);  // re-init and re-calc
-    }
+    pData->enableHRIRsDiffuseEQ = newState;
+    roombinauraliser_refreshSettings(hBin);  // re-init and re-calc
 }
 
 void roombinauraliser_setInputConfigPreset(void* const hBin, int newPresetID)
@@ -453,9 +449,8 @@ void roombinauraliser_setRPYflag(void* const hBin, int newState)
 void roombinauraliser_setInterpMode(void* const hBin, int newMode)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    int ch;
-    for(ch=0; ch<MAX_NUM_INPUTS; ch++)
-        pData->recalc_hrtf_interpFLAG = 1;
+    pData->interpMode = newMode;
+    pData->recalc_hrtf_interpFLAG = 1;
 }
 
 void roombinauraliser_setSourceGain(void* const hAmbi, int srcIdx, float newGain)
@@ -471,7 +466,6 @@ void roombinauraliser_muteSource(void* const hAmbi, int srcIdx, _Bool muted)
         pData->src_gains[srcIdx] = 0;
     else
         pData->src_gains[srcIdx] = 1;
-
 }
 void roombinauraliser_setSourceSolo(void* const hAmbi, int srcIdx)
 {

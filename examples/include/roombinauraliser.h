@@ -51,6 +51,11 @@
 extern "C" {
 #endif /* __cplusplus */
 
+/** Available interpolation modes */
+typedef enum {
+    INTERP_TRI = 1, /**< Triangular interpolation */
+    INTERP_TRI_PS   /**< Triangular interpolation (with phase-simplification) */
+}INTERP_MODES;
 
 /* ========================================================================== */
 /*                               Main Functions                               */

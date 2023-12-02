@@ -152,7 +152,7 @@ typedef struct _saf_sofa_container{
                                    *   rReceivers x 3 x 1 or rReceivers x 3 x mMeasurements */
     float* SourceView;            /**< Vector pointing forwards from the
                                    *   source position (Cartesian) [I C] or [M C]; 3 x 1 or 3  */
-    float* SourceUp;              /**< /**< Vector pointing upwards from the listener [I C] or [M C]
+    float* SourceUp;              /**< Vector pointing upwards from the listener [I C] or [M C]
                                    *   position (Cartesian); 1 x 3 or FLAT: mMeasurements x 3  */ 
     
     int* MeasurementDate;         /**< Optional M-dependent date and time of the measurement. 

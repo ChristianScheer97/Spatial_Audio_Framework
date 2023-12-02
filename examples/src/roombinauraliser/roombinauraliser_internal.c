@@ -46,16 +46,18 @@ void roombinauraliser_setCodecStatus(void* const hBin, CODEC_STATUS newStatus)
 void roombinauraliser_interpHRTFs
 (
     void* const hBin,
+    INTERP_MODES mode,
     float azimuth_deg,
     float elevation_deg,
     float_complex h_intrp[MAX_NUM_INPUTS][HYBRID_BANDS][NUM_EARS]
 )
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    int i, band;
+    int i, band, source;
     int aziIndex, elevIndex, N_azi, idx3d;
-    float_complex weights_cmplx[3], hrtf_fb3[MAX_NUM_INPUTS][NUM_EARS][3];
-    float aziRes, elevRes, weights[3];
+    float_complex weights_cmplx[3], hrtf_fb3[MAX_NUM_INPUTS][NUM_EARS][3], ipd[MAX_NUM_INPUTS];
+    float aziRes, elevRes, weights[3], itds3[MAX_NUM_INPUTS][3], itdInterp;
+    float magnitudes3[pData->nSources][HYBRID_BANDS][3][NUM_EARS], magInterp[MAX_NUM_INPUTS][HYBRID_BANDS][NUM_EARS];
     const float_complex calpha = cmplxf(1.0f, 0.0f), cbeta = cmplxf(0.0f, 0.0f);
      
     /* find closest pre-computed VBAP direction */
@@ -70,20 +72,57 @@ void roombinauraliser_interpHRTFs
     for (i = 0; i < 3; i++)
         weights[i] = pData->hrtf_vbap_gtableComp[idx3d*3 + i];
     
-    /* Interpolate */
-    for (i = 0; i < 3; i++)
-        weights_cmplx[i] = cmplxf(weights[i], 0.0f);
-    for (int source=0; source < pData->nSources; source++){
-        for (band = 0; band < HYBRID_BANDS; band++) {
-            for (i = 0; i < 3; i++){
-                hrtf_fb3[source][0][i] = pData->hrtf_fb[source][band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
-                hrtf_fb3[source][1][i] = pData->hrtf_fb[source][band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
+    switch (mode) {
+        case INTERP_TRI:
+            /* Interpolate */
+            for (i = 0; i < 3; i++)
+                weights_cmplx[i] = cmplxf(weights[i], 0.0f);
+            for (source=0; source < pData->nSources; source++){
+                for (band = 0; band < HYBRID_BANDS; band++) {
+                    for (i = 0; i < 3; i++){
+                        hrtf_fb3[source][0][i] = pData->hrtf_fb[source][band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
+                        hrtf_fb3[source][1][i] = pData->hrtf_fb[source][band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
+                    }
+                    cblas_cgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, NUM_EARS, 1, 3, &calpha,
+                                (float_complex*)hrtf_fb3[source], 3,
+                                (float_complex*)weights_cmplx, 1, &cbeta,
+                                (float_complex*)h_intrp[source][band], 1);
+                }
             }
-            cblas_cgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, NUM_EARS, 1, 3, &calpha,
-                        (float_complex*)hrtf_fb3[source], 3,
-                        (float_complex*)weights_cmplx, 1, &cbeta,
-                        (float_complex*)h_intrp[source][band], 1);
-        }
+            break;
+        case INTERP_TRI_PS:
+            /* retrieve the 3 itds and hrtf magnitudes */
+            for (source=0; source<pData->nSources; source++){
+                for (i = 0; i < 3; i++) {
+                    itds3[source][i] = pData->itds_s[source][pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
+                    for (band = 0; band < HYBRID_BANDS; band++) {
+                        magnitudes3[source][band][i][0] = pData->hrtf_fb_mag[source][band*NUM_EARS*(pData->N_hrir_dirs) + 0*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
+                        magnitudes3[source][band][i][1] = pData->hrtf_fb_mag[source][band*NUM_EARS*(pData->N_hrir_dirs) + 1*(pData->N_hrir_dirs) + pData->hrtf_vbap_gtableIdx[idx3d*3+i]];
+                    }
+                }
+              
+                /* interpolate hrtf magnitudes and itd */
+                cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 1, 1, 3, 1.0f,
+                            (float*)weights, 3,
+                            (float*)itds3[source], 1, 0.0f,
+                            &itdInterp, 1);
+                for (band = 0; band < HYBRID_BANDS; band++)
+                    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 1, 2, 3, 1.0f,
+                                (float*)weights, 3,
+                                (float*)magnitudes3[source][band], 2, 0.0f,
+                                (float*)magInterp[source][band], 2);
+                
+                /* introduce interaural phase difference */
+                for (band = 0; band < HYBRID_BANDS; band++) {
+                    if(pData->freqVector[band]<1.5e3f)
+                        ipd[source] = cmplxf(0.0f, (matlab_fmodf(2.0f*SAF_PI*(pData->freqVector[band]) * itdInterp + SAF_PI, 2.0f*SAF_PI) - SAF_PI)/2.0f);
+                    else
+                        ipd[source] = cmplxf(0.0f, 0.0f);
+                    h_intrp[source][band][0] = crmulf(cexpf(ipd[source]),        magInterp[source][band][0]);
+                    h_intrp[source][band][1] = crmulf(conjf(cexpf(ipd[source])), magInterp[source][band][1]);
+                }
+            }
+            break;
     }
 }
 
@@ -99,8 +138,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     
     strcpy(pData->progressBarText,"Loading BRIRs");
     strcpy(pData->progressBarTooltip,"Reading impulse response data from the specified SOFA file");
-
-    pData->progressBar0_1 = 0.2f;
+    pData->progressBar0_1 = 0.1f;
     
     /* load sofa file or load default hrir data */
 #ifdef SAF_ENABLE_SOFA_READER_MODULE
@@ -122,8 +160,6 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             pData->N_hrir_dirs = sofa.nSources;
             pData->nEmitters = sofa.nEmitters;
             pData->new_nSources = pData->nSources = sofa.nEmitters;
-            //pData->hrirs = realloc1d(pData->hrirs, pData->N_hrir_dirs*NUM_EARS*pData->nSources*(pData->hrir_loaded_len)*sizeof(float));
-            //pData->hrirs = NULL;
             pData->hrirs = (float**)malloc2d(pData->nSources, pData->N_hrir_dirs*NUM_EARS*(pData->hrir_loaded_len), sizeof(float));
             
             for(int cycle=0; cycle<pData->N_hrir_dirs*NUM_EARS; cycle++)
@@ -133,20 +169,19 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
                            pData->hrir_loaded_len*sizeof(float));
                 
             pData->hrir_dirs_deg = realloc1d(pData->hrir_dirs_deg, pData->N_hrir_dirs*2*sizeof(float));
-
             cblas_scopy(pData->N_hrir_dirs, sofa.ListenerView, 3, pData->hrir_dirs_deg, 2); /* azi */
             cblas_scopy(pData->N_hrir_dirs, &sofa.ListenerView[1], 3, &pData->hrir_dirs_deg[1], 2); /* elev */
             
-            
-            
             /* Set Emitters to Points specified in BRIR */
             if (!strcmp(sofa.EmitterPositionUnits, "metre")) { /* strcmp returns 0 if both strings are equal, therefor !strcmp = true */
+                
                 /* cartesian coordinates */
                 for (int i=0; i<sofa.nEmitters; i++){
                     pData->src_dirs_xyz[i][0] = sofa.EmitterPosition[3*i+0];
                     pData->src_dirs_xyz[i][1] = sofa.EmitterPosition[3*i+1];
                     pData->src_dirs_xyz[i][2] = sofa.EmitterPosition[3*i+2];
                     
+                    /* also convert to spherical */
                     float temp_sph[3];
                     cart2sph(&sofa.EmitterPosition[3*i], 1, 1, temp_sph);
                     pData->src_dirs_deg[i][0] = temp_sph[0];
@@ -156,7 +191,8 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             else {
                 /* spherical coordinates */
                 for (int i=0; i<sofa.nEmitters; i++) {
-
+                    
+                    /* azimuth */
                     if (sofa.EmitterPosition[3*i+0] > 180)
                         pData->src_dirs_deg[i][0] = sofa.EmitterPosition[3*i+0] - 360.0;
                     else if (sofa.EmitterPosition[3*i+0] < -180)
@@ -164,6 +200,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
                     else
                         pData->src_dirs_deg[i][0] = sofa.EmitterPosition[3*i+0];
                     
+                    /* elevation */
                     if (sofa.EmitterPosition[3 * i + 1] > 90)
                         pData->src_dirs_deg[i][1] = sofa.EmitterPosition[3 * i + 1] - 180;
                     else if (sofa.EmitterPosition[3 * i + 1] < -90)
@@ -171,6 +208,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
                     else
                         pData->src_dirs_deg[i][1] = sofa.EmitterPosition[3*i+1];
                     
+                    /* also convert to cartesian */
                     float temp_sph[3];
                     sph2cart(&sofa.EmitterPosition[3*i], 1, 1, temp_sph);
                     pData->src_dirs_xyz[i][0] = temp_sph[0];
@@ -187,7 +225,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     pData->useDefaultHRIRsFLAG = 1; /* Can only load the default HRIR data */
 #endif
     if(pData->useDefaultHRIRsFLAG){
-        /* Copy default HRIR data */
+        /* Build default BRIR from Binauraliser HRIR data */
         pData->hrir_loaded_fs = __default_hrir_fs;
         pData->hrir_loaded_len = __default_hrir_len;
         pData->N_hrir_dirs = __default_N_hrir_dirs;
@@ -204,7 +242,6 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
         pData->src_dirs_deg[0][1] = 0;
         pData->src_dirs_deg[1][1] = 0;
         
-        //memcpy(pData->hrirs[0], (float*)__default_hrirs, pData->N_hrir_dirs*NUM_EARS*(pData->hrir_loaded_len)*sizeof(float));
         pData->hrir_dirs_deg = realloc1d(pData->hrir_dirs_deg, pData->N_hrir_dirs*2*sizeof(float));
         memcpy(pData->hrir_dirs_deg, (float*)__default_hrir_dirs_deg, pData->N_hrir_dirs*2*sizeof(float));
 
@@ -217,19 +254,19 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     /* estimate the ITDs for each HRIR */
     strcpy(pData->progressBarText,"Estimating ITDs");
     strcpy(pData->progressBarTooltip,"Calculating time difference between both ears for all sources and directions");
-
-    pData->progressBar0_1 = 0.4f;
+    pData->progressBar0_1 = 0.3f;
+    
     pData->itds_s = (float**)realloc2d((void**)pData->itds_s, pData->nSources, pData->N_hrir_dirs, sizeof(float));
 
-    /*truncate hrirs for faster cross correlation processing*/
+    /* truncate hrirs for faster cross-correlation processing */
     int truncated_len = 1000;
     if (pData->hrir_loaded_len > truncated_len) {
-        float** hrirs_truncated = (float**)malloc2d(pData->nSources, NUM_EARS*pData->N_hrir_dirs*truncated_len, sizeof(float));
+        float* hrirs_truncated = (float*)malloc1d(NUM_EARS*pData->N_hrir_dirs*truncated_len*sizeof(float));
         for (int source=0; source<pData->nSources; source++) {
             for (int dir=0; dir<pData->N_hrir_dirs; dir++)
                 for (int ear=0; ear<NUM_EARS; ear++)
-                    memcpy(hrirs_truncated[source]+(NUM_EARS*dir+ear)*truncated_len, pData->hrirs[source]+(NUM_EARS*dir+ear), truncated_len*sizeof(float));
-            estimateITDs(hrirs_truncated[source], pData->N_hrir_dirs, truncated_len, pData->hrir_loaded_fs, pData->itds_s[source]);
+                    memcpy(hrirs_truncated+(NUM_EARS*dir+ear)*truncated_len, pData->hrirs[source]+(NUM_EARS*dir+ear), truncated_len*sizeof(float));
+            estimateITDs(hrirs_truncated, pData->N_hrir_dirs, truncated_len, pData->hrir_loaded_fs, pData->itds_s[source]);
         }
         free(hrirs_truncated);
     }
@@ -243,12 +280,13 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
         resample = NULL;
         for(int source=0; source<pData->nSources; source++){
             char buffer[PROGRESSBARTEXT_CHAR_LENGTH];
-            snprintf(buffer, sizeof(buffer), "Resampling the BRIRs (%d/%d)",source+1, pData->nSources);
+            snprintf(buffer, sizeof(buffer), "Resampling BRIRs (Source %d/%d)",source+1, pData->nSources);
             strcpy(pData->progressBarText, buffer);
             strcpy(pData->progressBarTooltip, "Resampling the impulse responses to match the DAW's sampling rate. This may take some time...");
-            pData->progressBar0_1 = 0.5f+0.1f*(source)/pData->nSources;
+            pData->progressBar0_1 = 0.5f+0.2f*(source)/pData->nSources;
+            
             resampleHRIRs(pData->hrirs[source], pData->N_hrir_dirs, pData->hrir_loaded_len, pData->hrir_loaded_fs, pData->fs, 1, &resample, &new_len);
-            if (source==0)
+            if (hrirs_resampled == NULL)
                 hrirs_resampled = (float**)realloc2d((void**)hrirs_resampled, pData->nSources, pData->N_hrir_dirs*NUM_EARS*new_len,sizeof(float));
             hrirs_resampled[source] = resample;
         }
@@ -270,33 +308,31 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     /* generate VBAP gain table */
     strcpy(pData->progressBarText,"Generating interpolation table");
     strcpy(pData->progressBarTooltip,"Calculating VBAP weights and filterbank coefficients");
-    pData->progressBar0_1 = 0.6f;
+    pData->progressBar0_1 = 0.7f;
+    
     hrtf_vbap_gtable = NULL;
     pData->hrtf_vbapTableRes[0] = 2;
     pData->hrtf_vbapTableRes[1] = 5;
-    
     pData->VBAP_3d_FLAG = 1;
 
     float elevation_max = -90.0f;
     float elevation_min = +90.0f;
-    for (int i = 1; i < pData->N_hrir_dirs; i += 2) {
+    for (int i = 1; i < pData->N_hrir_dirs; i += 2) { /* only compare elevation data, skip azimuth */
         elevation_max = SAF_MAX(elevation_max, pData->hrir_dirs_deg[i]);
         elevation_min = SAF_MIN(elevation_min, pData->hrir_dirs_deg[i]);
-        //printf("% .3f /  % .3f \n", elevation_min, elevation_max);
     }
 
-    if (fabsf((elevation_min + 90) / (180) - (elevation_max + 90) / (180)) < 1e-6) /* dont criticize the normalize*/
+    /* Differentiate between 3D and 2D VBAP */
+    if (fabsf((elevation_min + 90) / (180) - (elevation_max + 90) / (180)) < 1e-6) { /* dont criticize the normalize*/
         pData->VBAP_3d_FLAG = 0;
-   
-    if (pData->VBAP_3d_FLAG) {
-        generateVBAPgainTable3D(pData->hrir_dirs_deg, pData->N_hrir_dirs, pData->hrtf_vbapTableRes[0], pData->hrtf_vbapTableRes[1], 1, 0, 0.0f,
-            &hrtf_vbap_gtable, &(pData->N_hrtf_vbap_gtable), &(pData->nTriangles));
-    }
-
-    else {
         generateVBAPgainTable2D(pData->hrir_dirs_deg, pData->N_hrir_dirs, pData->hrtf_vbapTableRes[0],
-            &hrtf_vbap_gtable, &(pData->N_hrtf_vbap_gtable), &(pData->nTriangles));
+                                &hrtf_vbap_gtable, &(pData->N_hrtf_vbap_gtable), &(pData->nTriangles));
     }
+    else
+        generateVBAPgainTable3D(pData->hrir_dirs_deg, pData->N_hrir_dirs, pData->hrtf_vbapTableRes[0],
+                                pData->hrtf_vbapTableRes[1], 1, 0, 0.0f,
+                                &hrtf_vbap_gtable, &(pData->N_hrtf_vbap_gtable), &(pData->nTriangles));
+        
     
     if(hrtf_vbap_gtable==NULL){
         /* if generating vbap gain tabled failed, re-calculate with default HRIR set */
@@ -313,25 +349,19 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
 
     
     /* convert hrirs to filterbank coefficients */
-    pData->progressBar0_1 = 0.75f;
-    if (pData->useDefaultHRIRsFLAG) {
-        pData->hrtf_fb = (float_complex**)realloc2d((void**)pData->hrtf_fb, 2, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs), sizeof(float_complex));
-        HRIRs2HRTFs_afSTFT(pData->hrirs[0], pData->N_hrir_dirs, pData->hrir_runtime_len, HOP_SIZE, 0, 1, pData->hrtf_fb[0]);
-        HRIRs2HRTFs_afSTFT(pData->hrirs[1], pData->N_hrir_dirs, pData->hrir_runtime_len, HOP_SIZE, 0, 1, pData->hrtf_fb[1]);
-
-    }
-    else {
-        pData->hrtf_fb = (float_complex**)realloc2d((void**)pData->hrtf_fb, pData->nSources, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs), sizeof(float_complex));
-        for (int source = 0; source < pData->nSources; source++)
-            HRIRs2HRTFs_afSTFT(pData->hrirs[source], pData->N_hrir_dirs, pData->hrir_runtime_len, HOP_SIZE, 0, 1, pData->hrtf_fb[source]);
-    }
+    pData->progressBar0_1 = 0.85f;
+    pData->hrtf_fb = (float_complex**)realloc2d((void**)pData->hrtf_fb, pData->nSources, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs), sizeof(float_complex));
+    for (int source = 0; source < pData->nSources; source++)
+        HRIRs2HRTFs_afSTFT(pData->hrirs[source], pData->N_hrir_dirs, pData->hrir_runtime_len, HOP_SIZE, 0, 1, pData->hrtf_fb[source]);
+    
 
     /* HRIR pre-processing */
     if(pData->enableHRIRsDiffuseEQ){
         /* get integration weights */
         strcpy(pData->progressBarText,"Applying BRIR diffuse-field EQ");
         strcpy(pData->progressBarTooltip,"Applying BRIR diffuse-field EQ");
-        pData->progressBar0_1 = 0.9f;
+        pData->progressBar0_1 = 0.95f;
+        
         if(pData->N_hrir_dirs<=3600){
             pData->weights = realloc1d(pData->weights, pData->N_hrir_dirs*sizeof(float));
             float * hrir_dirs_rad = (float*) malloc1d(pData->N_hrir_dirs*2*sizeof(float));
@@ -342,9 +372,14 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             //    printf("%.3f, %.3f \n", hrir_dirs_rad[2*i], hrir_dirs_rad[2*i+1]);
             int supOrder = calculateGridWeights(hrir_dirs_rad, pData->N_hrir_dirs, -1, pData->weights);
             if(supOrder < 1){
-                saf_print_warning("Could not calculate grid weights");
-                free(pData->weights);
-                pData->weights = NULL;
+                if(pData->VBAP_3d_FLAG == 1) {
+                    saf_print_warning("Could not calculate grid weights");
+                    free(pData->weights);
+                    pData->weights = NULL;
+                }
+                else {
+                    /* DEQ weight calculation for 2D BRIRs go brrr */
+                }
             }
         }
         else{
@@ -357,23 +392,13 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     }
 
     /* calculate magnitude responses */
-    if (pData->useDefaultHRIRsFLAG) {
-        pData->hrtf_fb_mag = (float**)realloc2d((void**)pData->hrtf_fb_mag, pData->nSources, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs), sizeof(float));
+    pData->hrtf_fb_mag = (float**)realloc2d((void**)pData->hrtf_fb_mag, pData->nSources, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs), sizeof(float));
+    for (int source = 0; source < pData->nSources; source++)
         for (i = 0; i < HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs); i++)
-            pData->hrtf_fb_mag[0][i] = cabsf(pData->hrtf_fb[0][i]);
-
-    }
-    else {
-        pData->hrtf_fb_mag = (float**)realloc2d((void**)pData->hrtf_fb_mag, pData->nSources, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs), sizeof(float));
-        for (int source = 0; source < pData->nSources; source++)
-            for (i = 0; i < HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs); i++)
-                pData->hrtf_fb_mag[source][i] = cabsf(pData->hrtf_fb[source][i]);
-    }
-
-
+            pData->hrtf_fb_mag[source][i] = cabsf(pData->hrtf_fb[source][i]);
+    
     /* The HRTFs should be re-interpolated */
-    for(i=0; i<MAX_NUM_INPUTS; i++)
-        pData->recalc_hrtf_interpFLAG = 1;
+    pData->recalc_hrtf_interpFLAG = 1;
     
     /* clean-up */
     free(hrtf_vbap_gtable);

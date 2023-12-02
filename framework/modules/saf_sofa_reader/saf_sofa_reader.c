@@ -71,10 +71,11 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
     h->DataSamplingRate = 0.0f;
     h->nEmitters = h->nListeners = -1;
 
-    h->DataIR = h->SourcePosition = h->ReceiverPosition = h->ListenerPosition =
-    h->ListenerUp = h->ListenerView = h->EmitterPosition = h->DataDelay =
-    h->MeasurementDate = h->SourceUp = h->SourceView = h->ReceiverUp =
-    h->ReceiverView = h->RoomCorners = h->RoomCornerB = h->RoomCornerA =
+    h->DataIR = h->SourcePosition = h->ReceiverPosition = h->ListenerPosition
+    = h->ListenerUp = h->ListenerView = h->EmitterPosition = h->DataDelay
+    = h->SourceUp = h->SourceView = h->ReceiverUp = h->ReceiverView
+    = h->RoomCornerB = h->RoomCornerA = NULL;
+    h->MeasurementDate = NULL; h->RoomCorners = 0;
     h->RoomVolume = h->RoomTemperature = h->EmitterView = h->EmitterUp = NULL;
 
     /* Default strings */
@@ -1003,8 +1004,6 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                             if (typep != NC_DOUBLE) { return SAF_SOFA_ERROR_FORMAT_UNEXPECTED; }    
                             
                             /* Pull data */
-                            auto dim0 = dimlength[dimid[dimids[0]]];
-                            auto dim1 = dimlength[dimid[dimids[1]]];
                             tmp_size = dimlength[dimid[dimids[0]]] * dimlength[dimid[dimids[1]]];
                             tmp_data = realloc1d(tmp_data, tmp_size * sizeof(double));
                             nc_get_var(ncid, varid, tmp_data);                        
@@ -1179,7 +1178,6 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                             
                             
                             else if (!strcmp((char*)h->SOFAConventions, "MultiSpeakerBRIR")) { /* shape [mREn] */
-                                int test = (int)dimlength[dimid[dimids[0]]];
                                 //if (h->nSources != -1 && h->nSources != (int)dimlength[dimid[dimids[0]]]) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
                                 if (h->nReceivers != -1 && h->nReceivers != (int)dimlength[dimid[dimids[1]]]) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
                                 if (h->nEmitters != -1 && h->nEmitters != (int)dimlength[dimid[dimids[2]]]) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
@@ -1252,7 +1250,7 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
 
 SAF_SOFA_ERROR_CODES saf_sofa_open(saf_sofa_container* hSOFA, char* sofa_filepath, SAF_SOFA_READER_OPTIONS option)
 {
-    saf_sofa_open_universal(hSOFA, sofa_filepath, option, false);
+    return saf_sofa_open_universal(hSOFA, sofa_filepath, option, false);
 }
 
 void saf_sofa_close
