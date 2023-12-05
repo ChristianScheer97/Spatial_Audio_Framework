@@ -112,7 +112,7 @@ typedef struct _roombinauraliser
     char* progressBarTooltip;        /**< Tooltip for current (re)initialisation step, string */
     PROC_STATUS procStatus;          /**< see #PROC_STATUS */
     int recalc_hrtf_interpFLAG;      /**< 1: re-calculate/interpolate the HRTF, 0: do not */
-    int reInitHRTFsAndGainTables;    /**< 1: reinitialise the HRTFs and interpolation tables, 0: do not */
+    int reInitHRTFsAndGainTables;    /**< 1: reinitialise the HRTFs and interpolation tables, 2: only resample HRTFs, 3: only apply diffuse field EQ, 0: do nothing */
     int recalc_M_rotFLAG;            /**< 1: re-calculate the rotation matrix, 0: do not */
     int VBAP_3d_FLAG;                /**< 1: VBAP in 3 Dimensions, 0: VBAP in 2 Dimensions */
 

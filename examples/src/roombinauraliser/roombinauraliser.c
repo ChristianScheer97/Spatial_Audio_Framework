@@ -149,7 +149,9 @@ void roombinauraliser_init
     pData->fs = sampleRate;
     afSTFT_getCentreFreqs(pData->hSTFT, (float)sampleRate, HYBRID_BANDS, pData->freqVector);
     if(pData->hrir_runtime_fs!=pData->fs){
-        pData->reInitHRTFsAndGainTables = 1;
+        pData->reInitHRTFsAndGainTables = 2;
+        if (!pData->hrirs)
+            pData->reInitHRTFsAndGainTables = 1;
         roombinauraliser_setCodecStatus(hBin, CODEC_STATUS_NOT_INITIALISED);
     }
 
@@ -181,10 +183,7 @@ void roombinauraliser_initCodec
     roombinauraliser_initTFT(hBin);
     
     /* reinit HRTFs and interpolation tables */
-    if(pData->reInitHRTFsAndGainTables){
-        roombinauraliser_initHRTFsAndGainTables(hBin);
-        pData->reInitHRTFsAndGainTables = 0;
-    }
+    roombinauraliser_initHRTFsAndGainTables(hBin);
     
     /* done! */
     strcpy(pData->progressBarText,"Done!");
@@ -299,7 +298,6 @@ void roombinauraliser_process
 void roombinauraliser_refreshSettings(void* const hBin)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    pData->reInitHRTFsAndGainTables = 1;
     pData->recalc_hrtf_interpFLAG = 1;
     roombinauraliser_setCodecStatus(hBin, CODEC_STATUS_NOT_INITIALISED);
 }
@@ -343,6 +341,7 @@ void roombinauraliser_setUseDefaultHRIRsflag(void* const hBin, int newState)
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     if((!pData->useDefaultHRIRsFLAG) && (newState)){
         pData->useDefaultHRIRsFLAG = newState;
+        pData->reInitHRTFsAndGainTables = 1;
         roombinauraliser_refreshSettings(hBin);  // re-init and re-calc
     }
 }
@@ -353,6 +352,7 @@ void roombinauraliser_setSofaFilePath(void* const hBin, const char* path)
     pData->sofa_filepath = realloc1d(pData->sofa_filepath, strlen(path) + 1);
     strcpy(pData->sofa_filepath, path);
     pData->useDefaultHRIRsFLAG = 0;
+    pData->reInitHRTFsAndGainTables = 1;
     roombinauraliser_refreshSettings(hBin);  // re-init and re-calc
 }
 
@@ -360,6 +360,7 @@ void roombinauraliser_setEnableHRIRsDiffuseEQ(void* const hBin, int newState)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     pData->enableHRIRsDiffuseEQ = newState;
+    pData->reInitHRTFsAndGainTables = 3;
     roombinauraliser_refreshSettings(hBin);  // re-init and re-calc
 }
 
