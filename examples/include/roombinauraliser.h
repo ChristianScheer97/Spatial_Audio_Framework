@@ -338,6 +338,8 @@ int roombinauraliser_getDAWsamplerate(void* const hBin);
  */
 int roombinauraliser_getEnableRotation(void* const hBin);
 
+int roombinauraliser_getInterpMode(void* const hBin);
+
 /** Returns the 'yaw' rotation angle, in DEGREES */
 float roombinauraliser_getYaw(void* const hBin);
 

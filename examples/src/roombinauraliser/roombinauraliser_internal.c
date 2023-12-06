@@ -57,7 +57,7 @@ void roombinauraliser_interpHRTFs
     int aziIndex, elevIndex, N_azi, idx3d;
     float_complex weights_cmplx[3], hrtf_fb3[MAX_NUM_INPUTS][NUM_EARS][3], ipd[MAX_NUM_INPUTS];
     float aziRes, elevRes, weights[3], itds3[MAX_NUM_INPUTS][3], itdInterp;
-    float magnitudes3[pData->nSources][HYBRID_BANDS][3][NUM_EARS], magInterp[MAX_NUM_INPUTS][HYBRID_BANDS][NUM_EARS];
+    float magnitudes3[MAX_NUM_INPUTS][HYBRID_BANDS][3][NUM_EARS], magInterp[MAX_NUM_INPUTS][HYBRID_BANDS][NUM_EARS];
     const float_complex calpha = cmplxf(1.0f, 0.0f), cbeta = cmplxf(0.0f, 0.0f);
      
     /* find closest pre-computed VBAP direction */

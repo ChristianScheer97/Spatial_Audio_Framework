@@ -46,7 +46,7 @@ void roombinauraliser_create
     pData->useDefaultHRIRsFLAG = 1; /* pars->sofa_filepath must be valid to set this to 0 */
     pData->enableHRIRsDiffuseEQ = 0;
     pData->nSources = pData->new_nSources;
-    pData->interpMode = INTERP_TRI_PS;
+    pData->interpMode = INTERP_TRI;
     pData->nEmitters = 0;
     pData->yaw = 0.0f;
     pData->pitch = 0.0f;
@@ -372,8 +372,7 @@ void roombinauraliser_setInputConfigPreset(void* const hBin, int newPresetID)
     roombinauraliser_loadPreset(newPresetID, pData->src_dirs_deg, &(pData->new_nSources), &(dummy));
     if(pData->nSources != pData->new_nSources)
         roombinauraliser_setCodecStatus(hBin, CODEC_STATUS_NOT_INITIALISED);
-    for(ch=0; ch<MAX_NUM_INPUTS; ch++)
-        pData->recalc_hrtf_interpFLAG = 1;
+    pData->recalc_hrtf_interpFLAG = 1;
 }
 
 void roombinauraliser_setEnableRotation(void* const hBin, int newState)
@@ -383,8 +382,7 @@ void roombinauraliser_setEnableRotation(void* const hBin, int newState)
 
     pData->enableRotation = newState;
     if(!pData->enableRotation)
-        for (ch = 0; ch<MAX_NUM_INPUTS; ch++) 
-            pData->recalc_hrtf_interpFLAG = 1;
+        pData->recalc_hrtf_interpFLAG = 1;
 }
 
 void roombinauraliser_setEnablePartConv(void* const hBin, int newState)
@@ -588,6 +586,12 @@ int roombinauraliser_getUseDefaultHRIRsflag(void* const hBin)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     return pData->useDefaultHRIRsFLAG;
+}
+
+int roombinauraliser_getInterpMode(void* const hBin)
+{
+    roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
+    return (int)pData->interpMode;
 }
 
 char* roombinauraliser_getSofaFilePath(void* const hBin)
