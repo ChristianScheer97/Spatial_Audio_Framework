@@ -39,15 +39,12 @@ void roombinauraliser_create
 {
     roombinauraliser_data* pData = (roombinauraliser_data*)malloc1d(sizeof(roombinauraliser_data));
     *phBin = (void*)pData;
-    int ch, dummy;
 
     /* user parameters */
-    roombinauraliser_loadPreset(SOURCE_CONFIG_PRESET_DEFAULT, pData->src_dirs_deg, &(pData->new_nSources), &(dummy)); /*check setStateInformation if you change default preset*/
     pData->useDefaultHRIRsFLAG = 1; /* pars->sofa_filepath must be valid to set this to 0 */
     pData->enableHRIRsDiffuseEQ = 0;
-    pData->nSources = pData->new_nSources;
+    pData->nSources = 1;
     pData->interpMode = INTERP_TRI;
-    pData->nEmitters = 0;
     pData->yaw = 0.0f;
     pData->pitch = 0.0f;
     pData->roll = 0.0f;
@@ -92,10 +89,10 @@ void roombinauraliser_create
     strcpy(pData->progressBarTooltip, "");
     pData->codecStatus = CODEC_STATUS_NOT_INITIALISED;
     pData->procStatus = PROC_STATUS_NOT_ONGOING;
-    pData->reInitHRTFsAndGainTables = 1;
+    pData->reInitHRTFsAndGainTables = REINIT_FULL;
     pData->recalc_hrtf_interpFLAG = 1;
     pData->recalc_M_rotFLAG = 1;
-    for(ch=0; ch<MAX_NUM_INPUTS; ch++) {
+    for(int ch=0; ch<MAX_NUM_INPUTS; ch++) {
         pData->src_gains[ch] = 1.f;
     }
 }
@@ -149,9 +146,9 @@ void roombinauraliser_init
     pData->fs = sampleRate;
     afSTFT_getCentreFreqs(pData->hSTFT, (float)sampleRate, HYBRID_BANDS, pData->freqVector);
     if(pData->hrir_runtime_fs!=pData->fs){
-        pData->reInitHRTFsAndGainTables = 2;
+        pData->reInitHRTFsAndGainTables = REINIT_RESAMPLE;
         if (!pData->hrirs)
-            pData->reInitHRTFsAndGainTables = 1;
+            pData->reInitHRTFsAndGainTables = REINIT_FULL;
         roombinauraliser_setCodecStatus(hBin, CODEC_STATUS_NOT_INITIALISED);
     }
 
@@ -204,14 +201,13 @@ void roombinauraliser_process
 )
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    int ch, ear, i, band, nSources;//, nEmitters;
+    int ch, ear, i, band, nSources;
     float Rxyz[3][3], hypotxy;
     int enableRotation;
 
     /* copy user parameters to local variables */
     nSources = pData->nSources;
     enableRotation = pData->enableRotation;
-    //nEmitters = pData->nEmitters;
     
     /* apply binaural panner */
     if ((nSamples == roombinauraliser_FRAME_SIZE) && (pData->hrtf_fb!=NULL) && (pData->codecStatus==CODEC_STATUS_INITIALISED) ) {
@@ -236,22 +232,18 @@ void roombinauraliser_process
         if(enableRotation && pData->recalc_M_rotFLAG){
             yawPitchRoll2Rzyx (pData->yaw, pData->pitch, pData->roll, pData->useRollPitchYawFlag, Rxyz);
             pData->recalc_hrtf_interpFLAG = 1;
-            for (int i=0; i<pData->nSources; i++) {
-                pData->src_dirs_xyz[i][0] = 1.0f;
-                pData->src_dirs_xyz[i][1] = 0.0f;
-                pData->src_dirs_xyz[i][2] = 0.0f;
-                
-            }
-            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, nSources, 3, 3, 1.0f,
-                        (float*)(pData->src_dirs_xyz), 3,
+            
+            /* fixed reference frame to rotate around. For BRIRs, using actual source positions results in wrong results */
+            float reference[3] = {1.f, 0.f, 0.f};
+            cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, 1, 3, 3, 1.0f,
+                        (float*)reference, 3,
                         (float*)Rxyz, 3, 0.0f,
-                        (float*)(pData->src_dirs_rot_xyz), 3);
-
-            for(i=0; i<nSources; i++){
-                hypotxy = sqrtf(powf(pData->src_dirs_rot_xyz[i][0], 2.0f) + powf(pData->src_dirs_rot_xyz[i][1], 2.0f));
-                pData->src_dirs_rot_deg[i][0] = RAD2DEG(atan2f(pData->src_dirs_rot_xyz[i][1], pData->src_dirs_rot_xyz[i][0]));
-                pData->src_dirs_rot_deg[i][1] = RAD2DEG(atan2f(pData->src_dirs_rot_xyz[i][2], hypotxy));
-            }
+                        (float*)(pData->rot_xyz), 3);
+            
+            /* convert rotated reference frame to degrees */
+            hypotxy = sqrtf(powf(pData->rot_xyz[0], 2.0f) + powf(pData->rot_xyz[1], 2.0f));
+            pData->rot_deg[0] = RAD2DEG(atan2f(pData->rot_xyz[1], pData->rot_xyz[0]));
+            pData->rot_deg[1] = RAD2DEG(atan2f(pData->rot_xyz[2], hypotxy));
             pData->recalc_M_rotFLAG = 0;
         }
 
@@ -260,9 +252,9 @@ void roombinauraliser_process
         
         if(pData->recalc_hrtf_interpFLAG){
             if(enableRotation)
-                roombinauraliser_interpHRTFs(hBin, pData->interpMode, pData->src_dirs_rot_deg[0][0], pData->src_dirs_rot_deg[0][1], pData->hrtf_interp);
+                roombinauraliser_interpHRTFs(hBin, pData->interpMode, pData->rot_deg[0], pData->rot_deg[1], pData->hrtf_interp);
             else
-                roombinauraliser_interpHRTFs(hBin, pData->interpMode, pData->src_dirs_deg[0][0], pData->src_dirs_deg[0][1], pData->hrtf_interp);
+                roombinauraliser_interpHRTFs(hBin, pData->interpMode, 0, 0, pData->hrtf_interp);
             pData->recalc_hrtf_interpFLAG = 0;
         }
         
@@ -331,7 +323,7 @@ void roombinauraliser_setSourceElev_deg(void* const hBin, int index, float newEl
 void roombinauraliser_setNumSources(void* const hBin, int new_nSources)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    pData->new_nSources = SAF_CLAMP(new_nSources, 1, MAX_NUM_INPUTS);
+    pData->nSources = SAF_CLAMP(new_nSources, 1, MAX_NUM_INPUTS);
     pData->recalc_M_rotFLAG = 1;
     roombinauraliser_setCodecStatus(hBin, CODEC_STATUS_NOT_INITIALISED);
 }
@@ -341,7 +333,7 @@ void roombinauraliser_setUseDefaultHRIRsflag(void* const hBin, int newState)
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     if((!pData->useDefaultHRIRsFLAG) && (newState)){
         pData->useDefaultHRIRsFLAG = newState;
-        pData->reInitHRTFsAndGainTables = 1;
+        pData->reInitHRTFsAndGainTables = REINIT_FULL;
         roombinauraliser_refreshSettings(hBin);  // re-init and re-calc
     }
 }
@@ -352,7 +344,7 @@ void roombinauraliser_setSofaFilePath(void* const hBin, const char* path)
     pData->sofa_filepath = realloc1d(pData->sofa_filepath, strlen(path) + 1);
     strcpy(pData->sofa_filepath, path);
     pData->useDefaultHRIRsFLAG = 0;
-    pData->reInitHRTFsAndGainTables = 1;
+    pData->reInitHRTFsAndGainTables = REINIT_FULL;
     roombinauraliser_refreshSettings(hBin);  // re-init and re-calc
 }
 
@@ -360,26 +352,14 @@ void roombinauraliser_setEnableHRIRsDiffuseEQ(void* const hBin, int newState)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     pData->enableHRIRsDiffuseEQ = newState;
-    pData->reInitHRTFsAndGainTables = 3;
+    pData->reInitHRTFsAndGainTables = REINIT_DEQ;
     roombinauraliser_refreshSettings(hBin);  // re-init and re-calc
 }
 
-void roombinauraliser_setInputConfigPreset(void* const hBin, int newPresetID)
-{
-    roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    int ch, dummy;
-    
-    roombinauraliser_loadPreset(newPresetID, pData->src_dirs_deg, &(pData->new_nSources), &(dummy));
-    if(pData->nSources != pData->new_nSources)
-        roombinauraliser_setCodecStatus(hBin, CODEC_STATUS_NOT_INITIALISED);
-    pData->recalc_hrtf_interpFLAG = 1;
-}
 
 void roombinauraliser_setEnableRotation(void* const hBin, int newState)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    int ch;
-
     pData->enableRotation = newState;
     if(!pData->enableRotation)
         pData->recalc_hrtf_interpFLAG = 1;
@@ -527,7 +507,7 @@ float roombinauraliser_getSourceElev_deg(void* const hBin, int index)
 int roombinauraliser_getNumSources(void* const hBin)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    return pData->new_nSources;
+    return pData->nSources;
 }
 
 int roombinauraliser_getMaxNumSources()

@@ -106,40 +106,38 @@ typedef struct _roombinauraliser
     float_complex hrtf_interp[MAX_NUM_INPUTS][HYBRID_BANDS][NUM_EARS]; /**< Interpolated HRTFs */
     
     /* flags/status */
-    CODEC_STATUS codecStatus;        /**< see #CODEC_STATUS */
-    float progressBar0_1;            /**< Current (re)initialisation progress, between [0..1] */
-    char* progressBarText;           /**< Current (re)initialisation step, string */
-    char* progressBarTooltip;        /**< Tooltip for current (re)initialisation step, string */
-    PROC_STATUS procStatus;          /**< see #PROC_STATUS */
-    int recalc_hrtf_interpFLAG;      /**< 1: re-calculate/interpolate the HRTF, 0: do not */
-    int reInitHRTFsAndGainTables;    /**< 1: reinitialise the HRTFs and interpolation tables, 2: only resample HRTFs, 3: only apply diffuse field EQ, 0: do nothing */
-    int recalc_M_rotFLAG;            /**< 1: re-calculate the rotation matrix, 0: do not */
-    int VBAP_3d_FLAG;                /**< 1: VBAP in 3 Dimensions, 0: VBAP in 2 Dimensions */
+    CODEC_STATUS codecStatus;               /**< see #CODEC_STATUS */
+    float progressBar0_1;                   /**< Current (re)initialisation progress, between [0..1] */
+    char* progressBarText;                  /**< Current (re)initialisation step, string */
+    char* progressBarTooltip;               /**< Tooltip for current (re)initialisation step, string */
+    PROC_STATUS procStatus;                 /**< see #PROC_STATUS */
+    int recalc_hrtf_interpFLAG;             /**< 1: re-calculate/interpolate the HRTF, 0: do not */
+    REINIT_MODES reInitHRTFsAndGainTables;  /**< 1: reinitialise the HRTFs and interpolation tables, 2: only resample HRTFs, 3: only apply diffuse field EQ, 0: do nothing */
+    int recalc_M_rotFLAG;                   /**< 1: re-calculate the rotation matrix, 0: do not */
+    int VBAP_3d_FLAG;                       /**< 1: VBAP in 3 Dimensions, 0: VBAP in 2 Dimensions */
 
     /* misc. */
-    float src_dirs_rot_deg[MAX_NUM_INPUTS][2]; /**< Intermediate rotated source directions, in degrees */
-    float src_dirs_rot_xyz[MAX_NUM_INPUTS][3]; /**< Intermediate rotated source directions, as unit-length Cartesian coordinates */
-    float src_dirs_xyz[MAX_NUM_INPUTS][3];     /**< Intermediate source directions, as unit-length Cartesian coordinates  */
-    int nTriangles;                            /**< Number of triangles in the convex hull of the spherical arrangement of HRIR directions/points */
-    int new_nSources;                          /**< New number of input/source signals (current value will be replaced by this after next re-init) */
+    float rot_deg[2];                       /**< Intermediate rotated reference frame, in degrees */
+    float rot_xyz[3];                       /**< Intermediate rotated reference frame, as unit-length Cartesian coordinates */
+    float src_dirs_xyz[MAX_NUM_INPUTS][3];  /**< Intermediate source directions, as unit-length Cartesian coordinates  */
+    int nTriangles;                         /**< Number of triangles in the convex hull of the spherical arrangement of HRIR directions/points */
 
     /* user parameters */
-    int nSources;                            /**< Current number of input/source signals */
-    int nEmitters;
-    float src_dirs_deg[MAX_NUM_INPUTS][2];   /**< Current source/panning directions, in degrees */
-    INTERP_MODES interpMode;                 /**< see #INTERP_MODES */
-    int useDefaultHRIRsFLAG;                 /**< 1: use default HRIRs in database, 0: use those from SOFA file */
-    int enableHRIRsDiffuseEQ;                /**< flag to diffuse-field equalisation to the currently loaded HRTFs */
-    int enableRotation;                      /**< 1: enable rotation, 0: disable */
-    int enablePartConv;                      /**< 1 enable partitioned convolution, 0: disable */
-    float yaw;                               /**< yaw (Euler) rotation angle, in degrees */
-    float roll;                              /**< roll (Euler) rotation angle, in degrees */
-    float pitch;                             /**< pitch (Euler) rotation angle, in degrees */
-    int bFlipYaw;                            /**< flag to flip the sign of the yaw rotation angle */
-    int bFlipPitch;                          /**< flag to flip the sign of the pitch rotation angle */
-    int bFlipRoll;                           /**< flag to flip the sign of the roll rotation angle */
-    int useRollPitchYawFlag;                 /**< rotation order flag, 1: r-p-y, 0: y-p-r */
-    float src_gains[MAX_NUM_INPUTS];         /**< Gains applied per source */
+    int nSources;                           /**< Current number of input/source signals */
+    float src_dirs_deg[MAX_NUM_INPUTS][2];  /**< Current source/panning directions, in degrees */
+    INTERP_MODES interpMode;                /**< see #INTERP_MODES */
+    int useDefaultHRIRsFLAG;                /**< 1: use default HRIRs in database, 0: use those from SOFA file */
+    int enableHRIRsDiffuseEQ;               /**< flag to diffuse-field equalisation to the currently loaded HRTFs */
+    int enableRotation;                     /**< 1: enable rotation, 0: disable */
+    int enablePartConv;                     /**< 1 enable partitioned convolution, 0: disable */
+    float yaw;                              /**< yaw (Euler) rotation angle, in degrees */
+    float roll;                             /**< roll (Euler) rotation angle, in degrees */
+    float pitch;                            /**< pitch (Euler) rotation angle, in degrees */
+    int bFlipYaw;                           /**< flag to flip the sign of the yaw rotation angle */
+    int bFlipPitch;                         /**< flag to flip the sign of the pitch rotation angle */
+    int bFlipRoll;                          /**< flag to flip the sign of the roll rotation angle */
+    int useRollPitchYawFlag;                /**< rotation order flag, 1: r-p-y, 0: y-p-r */
+    float src_gains[MAX_NUM_INPUTS];        /**< Gains applied per source */
 
 } roombinauraliser_data;
 
@@ -184,27 +182,6 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin);
  * @note Call this function before roombinauraliser_initHRTFsAndGainTables()
  */
 void roombinauraliser_initTFT(void* const hBin);
-
-/**
- * Returns the source directions for a specified source config preset.
- *
- * The function also returns the number of source in the configuration
- * Note: default uniformly distributed points are used to pad the
- * dirs_deg matrix up to the #MAX_NUM_INPUTS, if nCH is less than
- * this. This can help avoid scenarios of many sources being panned in the same
- * direction, or triangulations errors.
- *
- * @param[in]  preset   See #SOURCE_CONFIG_PRESETS enum.
- * @param[out] dirs_deg Source directions, [azimuth elevation] convention, in
- *                      DEGREES;
- * @param[out] newNCH   (&) new number of channels
- * @param[out] nDims    (&) estimate of the number of dimensions (2 or 3)
- */
-void roombinauraliser_loadPreset(SOURCE_CONFIG_PRESETS preset,
-                             float dirs_deg[MAX_NUM_INPUTS][2],
-                             int* newNCH,
-                             int* nDims);
-
 
 #ifdef __cplusplus
 } /* extern "C" { */

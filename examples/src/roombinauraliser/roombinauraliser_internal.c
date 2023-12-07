@@ -129,9 +129,9 @@ void roombinauraliser_interpHRTFs
 void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    int i, new_len;
+    int new_len;
     float* hrtf_vbap_gtable, **hrirs_resampled, *resample;//, *hrir_dirs_rad
-    if (pData->reInitHRTFsAndGainTables == 0)
+    if (pData->reInitHRTFsAndGainTables == REINIT_NONE)
         return;
 #ifdef SAF_ENABLE_SOFA_READER_MODULE
     SAF_SOFA_ERROR_CODES error;
@@ -144,7 +144,8 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     
     /* load sofa file or load default hrir data */
 #ifdef SAF_ENABLE_SOFA_READER_MODULE
-    if(pData->reInitHRTFsAndGainTables == 1 && !pData->useDefaultHRIRsFLAG && pData->sofa_filepath!=NULL){
+    if(pData->reInitHRTFsAndGainTables == REINIT_FULL)
+        if (!pData->useDefaultHRIRsFLAG && pData->sofa_filepath!=NULL){
         /* Load SOFA file */
         //error = saf_sofa_open(&sofa, pData->sofa_filepath, SAF_SOFA_READER_OPTION_DEFAULT);
         error = saf_sofa_open_universal(&sofa, pData->sofa_filepath, SAF_SOFA_READER_OPTION_NETCDF, SAF_SOFA_READER_USECASE_BRIR);
@@ -160,8 +161,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             pData->hrir_loaded_fs = (int)sofa.DataSamplingRate;
             pData->hrir_loaded_len = sofa.DataLengthIR;
             pData->N_hrir_dirs = sofa.nSources;
-            pData->nEmitters = sofa.nEmitters;
-            pData->new_nSources = pData->nSources = sofa.nEmitters;
+            pData->nSources = sofa.nEmitters;
             pData->hrirs = (float**)malloc2d(pData->nSources, pData->N_hrir_dirs*NUM_EARS*(pData->hrir_loaded_len), sizeof(float));
             
             for(int cycle=0; cycle<pData->N_hrir_dirs*NUM_EARS; cycle++)
@@ -178,7 +178,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             if (!strcmp(sofa.EmitterPositionUnits, "metre")) { /* strcmp returns 0 if both strings are equal, therefor !strcmp = true */
                 
                 /* cartesian coordinates */
-                for (int i=0; i<sofa.nEmitters; i++){
+                for (int i=0; i<pData->nSources; i++){
                     pData->src_dirs_xyz[i][0] = sofa.EmitterPosition[3*i+0];
                     pData->src_dirs_xyz[i][1] = sofa.EmitterPosition[3*i+1];
                     pData->src_dirs_xyz[i][2] = sofa.EmitterPosition[3*i+2];
@@ -192,7 +192,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             }
             else {
                 /* spherical coordinates */
-                for (int i=0; i<sofa.nEmitters; i++) {
+                for (int i=0; i<pData->nSources; i++) {
                     
                     /* azimuth */
                     if (sofa.EmitterPosition[3*i+0] > 180)
@@ -226,7 +226,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
 #else
     pData->useDefaultHRIRsFLAG = 1; /* Can only load the default HRIR data */
 #endif
-    if(pData->reInitHRTFsAndGainTables == 1 && pData->useDefaultHRIRsFLAG){
+    if(pData->reInitHRTFsAndGainTables == REINIT_FULL && pData->useDefaultHRIRsFLAG){
         /* Build default BRIR from Binauraliser HRIR data */
         pData->hrir_loaded_fs = __default_hrir_fs;
         pData->hrir_loaded_len = __default_hrir_len;
@@ -235,7 +235,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
         pData->hrirs = (float**)realloc2d((void**)pData->hrirs, 2, pData->N_hrir_dirs *2* (pData->hrir_loaded_len), sizeof(float));
         cblas_scopy(pData->N_hrir_dirs * NUM_EARS * pData->hrir_loaded_len, (float*)__default_hrirs, 1, pData->hrirs[0], 1);
         cblas_scopy(pData->N_hrir_dirs * NUM_EARS * pData->hrir_loaded_len, (float*)__default_hrirs, 1, pData->hrirs[1], 1);
-        pData->new_nSources = pData->nSources = 2;
+        pData->nSources = 2;
         pData->src_dirs_xyz[0][0] = pData->src_dirs_xyz[1][0] = 2;
         pData->src_dirs_xyz[0][1] = pData->src_dirs_xyz[1][1] = 2;
         pData->src_dirs_xyz[0][2] = pData->src_dirs_xyz[1][2] = 0;
@@ -249,7 +249,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
 
 
     }
-    if(pData->reInitHRTFsAndGainTables == 1) {
+    if(pData->reInitHRTFsAndGainTables == REINIT_FULL) {
         /* Convert from the 0..360 convention, to -180..180 */
         convert_0_360To_m180_180(pData->hrir_dirs_deg, pData->N_hrir_dirs);
         
@@ -276,7 +276,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             for (int source=0; source>pData->nSources; source++)
                 estimateITDs(pData->hrirs[source], pData->N_hrir_dirs, pData->hrir_loaded_len, pData->hrir_loaded_fs, pData->itds_s[source]);
     }
-    if(pData->reInitHRTFsAndGainTables == 1 || pData->reInitHRTFsAndGainTables == 2) {
+    if(pData->reInitHRTFsAndGainTables == REINIT_FULL || pData->reInitHRTFsAndGainTables == REINIT_RESAMPLE) {
         /* Resample the HRIRs if needed */
         if(pData->hrir_loaded_fs!=pData->fs){
             hrirs_resampled = NULL;
@@ -301,6 +301,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             free(hrirs_resampled);
             
             pData->hrir_runtime_fs = pData->fs;
+            pData->hrir_loaded_fs = pData->fs; /* needed to enable sample rate switching without reloading sofa */
             pData->hrir_runtime_len = new_len;
         }
         else{
@@ -309,7 +310,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
         }
     }
     
-    if(pData->reInitHRTFsAndGainTables == 1) {
+    if(pData->reInitHRTFsAndGainTables == REINIT_FULL) {
         /* generate VBAP gain table */
         strcpy(pData->progressBarText,"Generating interpolation table");
         strcpy(pData->progressBarTooltip,"Calculating VBAP weights and filterbank coefficients");
@@ -328,12 +329,12 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
         }
         
         /* Differentiate between 3D and 2D VBAP */
-        if (fabsf((elevation_min + 90) / (180) - (elevation_max + 90) / (180)) < 1e-6) { /* dont criticize the normalize*/
+        if /* 2D */ (fabsf((elevation_min + 90) / (180) - (elevation_max + 90) / (180)) < 1e-6) { /* dont criticize the normalize */
             pData->VBAP_3d_FLAG = 0;
             generateVBAPgainTable2D(pData->hrir_dirs_deg, pData->N_hrir_dirs, pData->hrtf_vbapTableRes[0],
                                     &hrtf_vbap_gtable, &(pData->N_hrtf_vbap_gtable), &(pData->nTriangles));
         }
-        else
+        else /* 3D */
             generateVBAPgainTable3D(pData->hrir_dirs_deg, pData->N_hrir_dirs, pData->hrtf_vbapTableRes[0],
                                     pData->hrtf_vbapTableRes[1], 1, 0, 0.0f,
                                     &hrtf_vbap_gtable, &(pData->N_hrtf_vbap_gtable), &(pData->nTriangles));
@@ -342,7 +343,6 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
         if(hrtf_vbap_gtable==NULL){
             /* if generating vbap gain tabled failed, re-calculate with default HRIR set */
             pData->useDefaultHRIRsFLAG = 1;
-            pData->reInitHRTFsAndGainTables = 1;
             roombinauraliser_initHRTFsAndGainTables(hBin);
         }
         
@@ -352,6 +352,10 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
         pData->hrtf_vbap_gtableIdx = realloc1d(pData->hrtf_vbap_gtableIdx, pData->N_hrtf_vbap_gtable * 3 * sizeof(int));
         compressVBAPgainTable3D(hrtf_vbap_gtable, pData->N_hrtf_vbap_gtable, pData->N_hrir_dirs, pData->hrtf_vbap_gtableComp, pData->hrtf_vbap_gtableIdx);
         /* --> 3D GainTable compression also works in 2D */
+        
+        /* clean-up */
+        free(hrtf_vbap_gtable);
+        hrtf_vbap_gtable = NULL;
     }
     
     /* convert hrirs to filterbank coefficients */
@@ -378,7 +382,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             //    printf("%.3f, %.3f \n", hrir_dirs_rad[2*i], hrir_dirs_rad[2*i+1]);
             int supOrder = calculateGridWeights(hrir_dirs_rad, pData->N_hrir_dirs, -1, pData->weights);
             if(supOrder < 1){
-                if(pData->VBAP_3d_FLAG == 1) {
+                if(pData->VBAP_3d_FLAG) {
                     saf_print_warning("Could not calculate grid weights");
                     free(pData->weights);
                     pData->weights = NULL;
@@ -400,17 +404,11 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     /* calculate magnitude responses */
     pData->hrtf_fb_mag = (float**)realloc2d((void**)pData->hrtf_fb_mag, pData->nSources, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs), sizeof(float));
     for (int source = 0; source < pData->nSources; source++)
-        for (i = 0; i < HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs); i++)
+        for (int i = 0; i < HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs); i++)
             pData->hrtf_fb_mag[source][i] = cabsf(pData->hrtf_fb[source][i]);
     
     /* The HRTFs should be re-interpolated */
     pData->recalc_hrtf_interpFLAG = 1;
-    
-    /* clean-up */
-    if(!hrtf_vbap_gtable){
-        free(hrtf_vbap_gtable);
-        hrtf_vbap_gtable = NULL;
-    }
 }
 
 void roombinauraliser_initTFT
@@ -419,241 +417,6 @@ void roombinauraliser_initTFT
 )
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
- 
     if(pData->hSTFT==NULL)
-        afSTFT_create(&(pData->hSTFT), pData->new_nSources, NUM_EARS, HOP_SIZE, 0, 1, AFSTFT_BANDS_CH_TIME);
-    else if(pData->new_nSources!=pData->nSources){
-        afSTFT_channelChange(pData->hSTFT, pData->new_nSources, NUM_EARS);
-        afSTFT_clearBuffers(pData->hSTFT);
-    }
-    pData->nSources = pData->new_nSources;
+        afSTFT_create(&(pData->hSTFT), pData->nSources, NUM_EARS, HOP_SIZE, 0, 1, AFSTFT_BANDS_CH_TIME);
 }
-
-void roombinauraliser_loadPreset
-(
-    SOURCE_CONFIG_PRESETS preset,
-    float dirs_deg[MAX_NUM_INPUTS][2],
-    int* newNCH,
-    int* nDims
-)
-{
-    float sum_elev;
-    int ch, i, nCH;
-    
-    switch(preset){
-        default:
-        case SOURCE_CONFIG_PRESET_DEFAULT:
-            nCH = 1;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = 0.0f;
-            break;
-        case SOURCE_CONFIG_PRESET_MONO:
-            nCH = 1;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __mono_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_STEREO:
-            nCH = 2;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __stereo_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_5PX:
-            nCH = 5;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __5pX_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_7PX:
-            nCH = 7;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __7pX_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_8PX:
-            nCH = 8;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __8pX_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_9PX:
-            nCH = 9;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __9pX_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_10PX:
-            nCH = 10;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __10pX_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_11PX:
-            nCH = 11;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __11pX_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_11PX_7_4:
-            nCH = 11;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __11pX_7_4_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_13PX:
-            nCH = 13;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __13pX_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_22PX:
-            nCH = 22;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __22pX_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_22P2_9_10_3:
-            nCH = 24;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __9_10_3p2_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_AALTO_MCC:
-            nCH = 45;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __Aalto_MCC_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_AALTO_MCC_SUBSET:
-            nCH = 37;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __Aalto_MCCsubset_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_AALTO_APAJA:
-            nCH = 29;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __Aalto_Apaja_dirs_deg[ch][i];
-            break; 
-        case SOURCE_CONFIG_PRESET_AALTO_LR:
-            nCH = 13;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __Aalto_LR_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_DTU_AVIL:
-            nCH = 64;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __DTU_AVIL_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_ZYLIA_LAB:
-            nCH = 22;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __Zylia_Lab_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_T_DESIGN_4:
-            nCH = 4;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __Tdesign_degree_2_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_T_DESIGN_12:
-            nCH = 12;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __Tdesign_degree_4_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_T_DESIGN_24:
-            nCH = 24;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __Tdesign_degree_6_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_T_DESIGN_36:
-            nCH = 36;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __Tdesign_degree_8_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_T_DESIGN_48:
-            nCH = 48;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __Tdesign_degree_9_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_T_DESIGN_60:
-            nCH = 60;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __Tdesign_degree_10_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_SPH_COV_9:
-            nCH = 9;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __SphCovering_9_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_SPH_COV_16:
-            nCH = 16;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __SphCovering_16_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_SPH_COV_25:
-            nCH = 25;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __SphCovering_25_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_SPH_COV_49:
-            nCH = 49;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __SphCovering_49_dirs_deg[ch][i];
-            break;
-        case SOURCE_CONFIG_PRESET_SPH_COV_64:
-            nCH = 64;
-            for(ch=0; ch<nCH; ch++)
-                for(i=0; i<2; i++)
-                    dirs_deg[ch][i] = __SphCovering_64_dirs_deg[ch][i];
-            break;
-    }
-    
-    /* Fill remaining slots with default coords */
-    for(; ch<MAX_NUM_INPUTS; ch++){
-        for(i=0; i<2; i++){
-            dirs_deg[ch][i] = __default_LScoords64_rad[ch][i]* (180.0f/SAF_PI);
-        }
-    }
-    
-    /* For dynamically changing the number of TFT channels */
-    (*newNCH) = nCH;
-    
-    /* estimate number of dimensions. (Obviously fails if using 2D setups thare are on an angle.
-       However, in these cases, triangulation should fail and revert to 2D anyway) */
-    sum_elev = 0.0f;
-    for(i=0; i<nCH; i++){
-        sum_elev += dirs_deg[i][1];
-    }
-    if(sum_elev < 0.01f)
-        (*nDims) = 2;
-    else
-        (*nDims) = 3;
-}
- 
-
-
-
-
-
-
-
-
-
-
- 

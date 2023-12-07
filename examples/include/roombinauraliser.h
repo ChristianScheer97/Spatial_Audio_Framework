@@ -57,6 +57,13 @@ typedef enum {
     INTERP_TRI_PS   /**< Triangular interpolation (with phase-simplification) */
 }INTERP_MODES;
 
+/** Available re-init modes */
+typedef enum {
+    REINIT_NONE,        /**< no re-initialization needed */
+    REINIT_FULL,        /**< re-initialize everything */
+    REINIT_RESAMPLE,    /**< start re-initialization without loading sofa data */
+    REINIT_DEQ          /**< only re-initialize diffuse-field equalization */
+}REINIT_MODES;
 /* ========================================================================== */
 /*                               Main Functions                               */
 /* ========================================================================== */
@@ -169,9 +176,6 @@ void roombinauraliser_setSofaFilePath(void* const hBin, const char* path);
 
 /** Enable (1) or disable (0) the diffuse-field EQ applied to the HRTFs */
 void roombinauraliser_setEnableHRIRsDiffuseEQ(void* const hBin, int newState);
-
-/** Loads an input preset (see #SOURCE_CONFIG_PRESETS enum) */
-void roombinauraliser_setInputConfigPreset(void* const hBin, int newPresetID);
 
 /** Sets the flag to enable/disable (1 or 0) rotation */
 void roombinauraliser_setEnableRotation(void* const hBin, int newState);
