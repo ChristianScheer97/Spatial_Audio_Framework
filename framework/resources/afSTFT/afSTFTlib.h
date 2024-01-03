@@ -81,6 +81,15 @@ typedef enum {
     AFSTFT_TIME_CH_BANDS  /**< nTimeHops x nChannels x nBands */
 
 }AFSTFT_FDDATA_FORMAT;
+
+void afAnalyse(float* inTD/* nSamplesTD x nCH */,
+                      int nSamplesTD,
+                      int nCH,
+                      int hopSize,
+                      int LDmode,
+                      int hybridmode,
+                      float_complex* outTF); /* out_nBands x nTimeslots x nCH */
+
     
 /**
  * Creates an instance of afSTFT

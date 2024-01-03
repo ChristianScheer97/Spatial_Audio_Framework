@@ -42,9 +42,11 @@ void roombinauraliser_create
 
     /* user parameters */
     pData->useDefaultHRIRsFLAG = 1; /* pars->sofa_filepath must be valid to set this to 0 */
-    pData->enableHRIRsDiffuseEQ = 0;
+    pData->enableBRIRsDiffuseEQ = 0;
+    pData->enableFabianDiffuseEQ = 0;
     pData->nSources = 1;
     pData->interpMode = INTERP_TRI;
+    pData->externMode = NO_EXTERN;
     pData->yaw = 0.0f;
     pData->pitch = 0.0f;
     pData->roll = 0.0f;
@@ -348,10 +350,13 @@ void roombinauraliser_setSofaFilePath(void* const hBin, const char* path)
     roombinauraliser_refreshSettings(hBin);  // re-init and re-calc
 }
 
-void roombinauraliser_setEnableHRIRsDiffuseEQ(void* const hBin, int newState)
+void roombinauraliser_setEnableBRIRsDiffuseEQ(void* const hBin, int newState, int mode)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    pData->enableHRIRsDiffuseEQ = newState;
+    if (mode == EXTERN_FABIAN_CTF)
+        pData->enableFabianDiffuseEQ = newState;
+    else if (mode == EXTERN_BRIR_CTF)
+        pData->enableBRIRsDiffuseEQ = newState;
     pData->reInitHRTFsAndGainTables = REINIT_DEQ;
     roombinauraliser_refreshSettings(hBin);  // re-init and re-calc
 }
@@ -429,6 +434,14 @@ void roombinauraliser_setInterpMode(void* const hBin, int newMode)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
     pData->interpMode = newMode;
+
+    pData->recalc_hrtf_interpFLAG = 1;
+}
+
+void roombinauraliser_setExternMode(void* const hBin, int newMode)
+{
+    roombinauraliser_data  *pData = (roombinauraliser_data*)(hBin);
+    pData->externMode = newMode;
     pData->recalc_hrtf_interpFLAG = 1;
 }
 
@@ -574,6 +587,12 @@ int roombinauraliser_getInterpMode(void* const hBin)
     return (int)pData->interpMode;
 }
 
+int roombinauraliser_getExternMode(void* const hBin)
+{
+    roombinauraliser_data  *pData = (roombinauraliser_data *)(hBin);
+    return (int)pData->externMode;
+}
+
 char* roombinauraliser_getSofaFilePath(void* const hBin)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
@@ -583,10 +602,10 @@ char* roombinauraliser_getSofaFilePath(void* const hBin)
         return "no_file";
 }
 
-int roombinauraliser_getEnableHRIRsDiffuseEQ(void* const hBin)
+int roombinauraliser_getEnableBRIRsDiffuseEQ(void* const hBin)
 {
     roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
-    return pData->enableHRIRsDiffuseEQ;
+    return pData->enableBRIRsDiffuseEQ;
 }
 
 int roombinauraliser_getDAWsamplerate(void* const hBin)

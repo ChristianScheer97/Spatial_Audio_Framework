@@ -654,13 +654,6 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                     tmp_data = NULL;
                     tmp_data_reshaped = NULL;
                     /* Loop over the attributes and pull the info accordingly */
-                    
-                    /////////////////////////////////////////////////////////////// BEGIN
-                    // NOTE: The same as for HRIR, except that these information 
-                    // (the attributes) need to be pulled BEFORE the variables, in
-                    // order to have know about the convention before loading 
-                    // the data.
-                    
                     for (attnum = 0; attnum < nattsp; attnum++) {
                         nc_inq_attname(ncid, -1, attnum, attname);
                         nc_inq_attlen(ncid, -1, attname, &lenp);
@@ -754,10 +747,6 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                             nc_get_att(ncid, NC_GLOBAL, attname, h->ListenerShortName);
                         }
                     }
-                    /////////////////////////////////////////////////////////////// END
-                    
-                    /////////////////////////////////////////////////////////////// BEGIN
-                    // Exactly the same as for HRIRs
                     for (varid = 0; varid < nvarsp; varid++) /* Loop over all variables */
                     { 
                         nc_inq_var(ncid, varid, (char*)varname, NULL, NULL, NULL, NULL); /* Variable name */
@@ -766,11 +755,7 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                         nc_inq_vardimid(ncid, varid, dimids);                            /* Variable dimension IDs */
                         nc_inq_vartype(ncid, varid, &typep);                             /* Variable data type */
                         nc_inq_varnatts(ncid, varid, &varnattsp);                        /* Variable number of associated attributes */
-                        /////////////////////////////////////////////////////////////// END
-                        
-                        /////////////////////////////////////////////////////////////// BEGIN
-                        // Basically the same as for HRIRs
-                        
+
                         if (!strcmp((char*)varname, "ListenerPosition")) 
                         {
                             /* Checks */
@@ -803,12 +788,6 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                             }
                             
                         }
-                        /////////////////////////////////////////////////////////////// END
-                        
-                        
-                        /////////////////////////////////////////////////////////////// START
-                        // EXACTLY THE SAME AS FOR HRIRs
-                        
                         else if (!strcmp((char*)varname, "ReceiverPosition")) {
                             switch (ndimsp) {
                                     /* Many SOFA files have the "ReceiverPosition" variable with the following dimensions: nReceivers x 3  */
@@ -898,12 +877,7 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                                 }
                             }
                         }
-                        
-                        /////////////////////////////////////////////////////////////// END
-                        
-                        /////////////////////////////////////////////////////////////// BEGIN
-                        // THE SAME AS FOR HRIRs 
-                        
+
                         else if (!strcmp((char*)varname, "EmitterPosition")) {
                             switch (ndimsp) {
                                     /* Many SOFA files have the "EmitterPosition" variable with the following dimensions: nEmitters x 3  */
@@ -961,12 +935,6 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                                 }
                             }
                         }
-                        /////////////////////////////////////////////////////////////// END
-                        
-                        
-                        /////////////////////////////////////////////////////////////// BEGIN
-                        // THE SAME AS FOR HRIRs BUT ADDED DEFAULT CASES FOR 
-                        // EmitterPositionType AND EmitterPositionUnits
                         
                         else if (!strcmp((char*)varname, "ListenerUp")) {
                             /* Checks */
@@ -990,12 +958,6 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                                     h->ListenerUp[j] = (float)tmp_data[j];
                             }
                         }
-                        /////////////////////////////////////////////////////////////// END
-                        
-                        
-                        /////////////////////////////////////////////////////////////// BEGIN
-                        // THE SAME AS FOR HRIRs BUT ADDED DEFAULT CASES FOR 
-                        // ListenerViewType AND ListenerViewUnits
                         else if (!strcmp((char*)varname, "ListenerView")) {
                             /* Checks */
                             if (ndimsp != 2) { return SAF_SOFA_ERROR_DIMENSIONS_UNEXPECTED; }
@@ -1026,12 +988,7 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                                 }
                             }
                         }
-                        /////////////////////////////////////////////////////////////// END
-                        
-                        
-                        /////////////////////////////////////////////////////////////// BEGIN
-                        // NEWLY ADDED
-                        
+
                         else if (!strcmp((char*)varname, "EmitterUp")) {
                             switch (ndimsp) {
                                     /* Many SOFA files have the "EmitterUp" variable with the following dimensions: nEmitters x 3  */
@@ -1074,11 +1031,6 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                                     break;
                             }
                         }
-                        /////////////////////////////////////////////////////////////// END
-                        
-                        
-                        /////////////////////////////////////////////////////////////// BEGIN
-                        // NEWLY ADDED
                         
                         else if (!strcmp((char*)varname, "EmitterView")) {
                             switch (ndimsp) {
@@ -1122,7 +1074,6 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                                     break;
                             }
                         }
-                        /////////////////////////////////////////////////////////////// END
                         
                         if (!strcmp((char*)varname, "Data.IR")) {
                             /* Checks */
@@ -1234,7 +1185,6 @@ SAF_SOFA_ERROR_CODES saf_sofa_open_universal
                         }
                     }
                     
-                    // WORK STATE
 #else
                     saf_print_error("SAF_ENABLE_NETCDF must be defined to use this SOFA reader!");
 #endif /* SAF_ENABLE_NETCDF */

@@ -57,6 +57,12 @@ typedef enum {
     INTERP_TRI_PS   /**< Triangular interpolation (with phase-simplification) */
 }INTERP_MODES;
 
+typedef enum {
+    NO_EXTERN, /**< No extalernalisation eq at all */
+    EXTERN_FABIAN_CTF, /**< Use pregenerated diffuse field equalization filter of the FABIAN dummy head (https://www.researchgate.net/publication/313650711_The_FABIAN_head-related_transfer_function_data_base) */
+    EXTERN_BRIR_CTF, /**< Calculate diffuse field equalization filter from loaded BRIR data */
+    EXTERN_OWN_FILTER /**< Use an own externalization filter loaded as a .sofa file */
+}EXTERN_MODES;
 /** Available re-init modes */
 typedef enum {
     REINIT_NONE,        /**< no re-initialization needed */
@@ -175,7 +181,7 @@ void roombinauraliser_setUseDefaultHRIRsflag(void* const hBin, int newState);
 void roombinauraliser_setSofaFilePath(void* const hBin, const char* path);
 
 /** Enable (1) or disable (0) the diffuse-field EQ applied to the HRTFs */
-void roombinauraliser_setEnableHRIRsDiffuseEQ(void* const hBin, int newState);
+void roombinauraliser_setEnableBRIRsDiffuseEQ(void* const hBin, int newState, int mode);
 
 /** Sets the flag to enable/disable (1 or 0) rotation */
 void roombinauraliser_setEnableRotation(void* const hBin, int newState);
@@ -219,6 +225,7 @@ void roombinauraliser_setRPYflag(void* const hBin, int newState);
 /** NOT IMPLEMENTED YET */
 void roombinauraliser_setInterpMode(void* const hBin, int newMode);
 
+void roombinauraliser_setExternMode(void* const hBin, int newMode);
 /**
  * Sets gain factor for an input source.
  */
@@ -331,7 +338,7 @@ char* roombinauraliser_getSofaFilePath(void* const hBin);
  * Returns the flag indicating whether the diffuse-field EQ applied to the HRTFs
  * is enabled (1) or disabled (0).
  */
-int roombinauraliser_getEnableHRIRsDiffuseEQ(void* const hBin);
+int roombinauraliser_getEnableBRIRsDiffuseEQ(void* const hBin);
 
 /** Returns the DAW/Host sample rate */
 int roombinauraliser_getDAWsamplerate(void* const hBin);
@@ -344,6 +351,7 @@ int roombinauraliser_getEnableRotation(void* const hBin);
 
 int roombinauraliser_getInterpMode(void* const hBin);
 
+int roombinauraliser_getExternMode(void* const hBin);
 /** Returns the 'yaw' rotation angle, in DEGREES */
 float roombinauraliser_getYaw(void* const hBin);
 

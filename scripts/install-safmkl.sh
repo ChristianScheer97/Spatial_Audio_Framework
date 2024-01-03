@@ -51,7 +51,7 @@ fi
 if [ ! -z "$3" ]; then
     mkl_builder_dir=${3}
 else
-    mkl_builder_dir="/opt/intel/oneapi/mkl/latest/tools/builder"
+    mkl_builder_dir="/opt/intel/oneapi/mkl/2024.0/share/mkl/tools/builder"
     echo "Using default MKL builder path (${mkl_builder_dir})"
 fi
 
