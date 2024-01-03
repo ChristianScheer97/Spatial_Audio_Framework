@@ -58,11 +58,10 @@ typedef enum {
 }INTERP_MODES;
 
 typedef enum {
-    NO_EXTERN, /**< No extalernalisation eq at all */
-    EXTERN_FABIAN_CTF, /**< Use pregenerated diffuse field equalization filter of the FABIAN dummy head (https://www.researchgate.net/publication/313650711_The_FABIAN_head-related_transfer_function_data_base) */
-    EXTERN_BRIR_CTF, /**< Calculate diffuse field equalization filter from loaded BRIR data */
-    EXTERN_OWN_FILTER /**< Use an own externalization filter loaded as a .sofa file */
-}EXTERN_MODES;
+    DIFF_EQ_FABIAN_CTF = 1, /**< Use pregenerated diffuse field equalization filter of the FABIAN dummy head (https://www.researchgate.net/publication/313650711_The_FABIAN_head-related_transfer_function_data_base) */
+    DIFF_EQ_BRIR_CTF, /**< Calculate diffuse field equalization filter from loaded BRIR data */
+    DIFF_EQ_OWN_FILTER /**< Use an own externalization filter loaded as a .sofa file */
+}DIFF_EQ_MODES;
 /** Available re-init modes */
 typedef enum {
     REINIT_NONE,        /**< no re-initialization needed */
@@ -181,7 +180,7 @@ void roombinauraliser_setUseDefaultHRIRsflag(void* const hBin, int newState);
 void roombinauraliser_setSofaFilePath(void* const hBin, const char* path);
 
 /** Enable (1) or disable (0) the diffuse-field EQ applied to the HRTFs */
-void roombinauraliser_setEnableBRIRsDiffuseEQ(void* const hBin, int newState, int mode);
+void roombinauraliser_setEnableBRIRsDiffuseEQ(void* const hBin, int newState);
 
 /** Sets the flag to enable/disable (1 or 0) rotation */
 void roombinauraliser_setEnableRotation(void* const hBin, int newState);
@@ -225,7 +224,7 @@ void roombinauraliser_setRPYflag(void* const hBin, int newState);
 /** NOT IMPLEMENTED YET */
 void roombinauraliser_setInterpMode(void* const hBin, int newMode);
 
-void roombinauraliser_setExternMode(void* const hBin, int newMode);
+void roombinauraliser_setDiffuseEqMode(void* const hBin, int newMode);
 /**
  * Sets gain factor for an input source.
  */
@@ -351,7 +350,7 @@ int roombinauraliser_getEnableRotation(void* const hBin);
 
 int roombinauraliser_getInterpMode(void* const hBin);
 
-int roombinauraliser_getExternMode(void* const hBin);
+int roombinauraliser_getDiffuseEqMode(void* const hBin);
 /** Returns the 'yaw' rotation angle, in DEGREES */
 float roombinauraliser_getYaw(void* const hBin);
 

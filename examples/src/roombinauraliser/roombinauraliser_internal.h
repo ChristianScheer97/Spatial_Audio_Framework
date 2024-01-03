@@ -37,7 +37,6 @@
 #include "saf.h"           /* Main include header for SAF */
 #include "saf_externals.h" /* To also include SAF dependencies (cblas etc.) */
 #include "netcdf.h"        /* Include NetCDF*/
-//#include "FABIAN_ctf.h"
 #include "../../../framework/resources/afSTFT/afSTFTlib.h"
 //#include " ../../../modules/saf_sofa_reader/libmysofa/internal/mysofa_internal.h"
 #ifdef __cplusplus
@@ -134,10 +133,9 @@ typedef struct _roombinauraliser
     int nSources;                           /**< Current number of input/source signals */
     float src_dirs_deg[MAX_NUM_INPUTS][2];  /**< Current source/panning directions, in degrees */
     INTERP_MODES interpMode;                /**< see #INTERP_MODES */
-    EXTERN_MODES externMode;
+    DIFF_EQ_MODES diffEqMode;
     int useDefaultHRIRsFLAG;                /**< 1: use default HRIRs in database, 0: use those from SOFA file */
     int enableBRIRsDiffuseEQ;               /**< flag to diffuse-field equalisation to the currently loaded BRIRs */
-    int enableFabianDiffuseEQ;              /**< flag to diffuse-field equalisation to teh currently loaded BRIRs with the CTF of the FABIAN dummy head's HRTFs */
     int enableRotation;                     /**< 1: enable rotation, 0: disable */
     int enablePartConv;                     /**< 1 enable partitioned convolution, 0: disable */
     float yaw;                              /**< yaw (Euler) rotation angle, in degrees */

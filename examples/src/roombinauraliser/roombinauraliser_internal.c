@@ -362,12 +362,10 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     for (int source = 0; source < pData->nSources; source++)
         HRIRs2HRTFs_afSTFT(pData->hrirs[source], pData->N_hrir_dirs, pData->hrir_runtime_len, HOP_SIZE, 0, 1, (float_complex*)pData->hrtf_fb[source]);
 
-
-    /* HRIR pre-processing / Diffuse field equalisation */
-    if(pData->enableBRIRsDiffuseEQ){
-
+    /* Apply diffuse field equalisation */
+    if (pData->enableBRIRsDiffuseEQ) {
         /* dummy head (FABIAN) diffuse field equalisation */
-        if (pData->enableFabianDiffuseEQ) {
+        if (roombinauraliser_getDiffuseEqMode(hBin) == DIFF_EQ_FABIAN_CTF) {
             strcpy(pData->progressBarText, "Applying dummy head diffuse-field EQ");
             strcpy(pData->progressBarTooltip, "Applying dummy head diffuse-field EQ");
             pData->progressBar0_1 = 0.95f;
@@ -376,7 +374,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             memcpy(pData->fabian_cir, &fabian_ir, pData->N_samples_fabian_cir);
             pData->ctf_fb = (float_complex*)realloc1d((void**)pData->ctf_fb,HYBRID_BANDS * NUM_EARS * sizeof(double_complex));
 
-            /* convert FABIAN dummy head cir to filterbank coefficients */
+            /* convert FABIAN dummy head cir to filter bank coefficients */
             afAnalyse(pData->fabian_cir, pData->N_samples_fabian_cir, 1, HOP_SIZE, 0, 1, pData->ctf_fb);
 
             /* perform equalisation */
@@ -394,8 +392,8 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             }
         }
 
-        else if (pData->enableBRIRsDiffuseEQ) {
-            /* equalise diffuse field with loaded BRIR data*/
+        /* equalise diffuse field with loaded BRIR data */
+        else if (roombinauraliser_getDiffuseEqMode(hBin) == DIFF_EQ_BRIR_CTF) {
             strcpy(pData->progressBarText,"Applying BRIR diffuse-field EQ");
             strcpy(pData->progressBarTooltip,"Applying BRIR diffuse-field EQ");
             pData->progressBar0_1 = 0.95f;
