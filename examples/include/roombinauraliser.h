@@ -182,6 +182,8 @@ void roombinauraliser_setSofaFilePath(void* const hBin, const char* path);
 
 /** Enable (1) or disable (0) the diffuse-field EQ applied to the HRTFs */
 void roombinauraliser_setEnableHRIRsDiffuseEQ(void* const hBin, int newState);
+int roombinauraliser_getDiffuseEqMode(void* const hBin);
+void roombinauraliser_setDiffuseEqMode(void* const hBin, int newMode);
 
 /** Sets the flag to enable/disable (1 or 0) rotation */
 void roombinauraliser_setEnableRotation(void* const hBin, int newState);

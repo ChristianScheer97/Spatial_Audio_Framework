@@ -648,3 +648,17 @@ int roombinauraliser_getProcessingDelay()
 {
     return 12*HOP_SIZE;
 }
+
+
+int roombinauraliser_getDiffuseEqMode(void* const hBin)
+{
+    roombinauraliser_data  *pData = (roombinauraliser_data *)(hBin);
+    return (int)pData->diffEqMode;
+}
+
+void roombinauraliser_setDiffuseEqMode(void* const hBin, int newMode)
+{
+    roombinauraliser_data  *pData = (roombinauraliser_data*)(hBin);
+    pData->diffEqMode = newMode;
+    pData->recalc_hrtf_interpFLAG = 1;
+}

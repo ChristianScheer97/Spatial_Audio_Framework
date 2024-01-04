@@ -75,7 +75,7 @@ static const float __stft2hybCentreFreq[9][5] =
 
 /** Passes input time-domain data through the afSTFT filterbank.
  *  Copyright (c) 2015 Juha Vilkamo, MIT license */
-static void afAnalyse
+void afAnalyse
 (
     float* inTD/* nSamplesTD x nCH */,
     int nSamplesTD,

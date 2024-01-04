@@ -366,41 +366,71 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
 
 
     /* HRIR pre-processing */
-    if(pData->enableHRIRsDiffuseEQ){
-        /* get integration weights */
-        strcpy(pData->progressBarText,"Applying BRIR diffuse-field EQ");
-        strcpy(pData->progressBarTooltip,"Applying BRIR diffuse-field EQ");
-        pData->progressBar0_1 = 0.95f;
+/* Apply diffuse field equalisation */
+    if (pData->enableHRIRsDiffuseEQ) {
+        /* dummy head (FABIAN) diffuse field equalisation */
+        if (roombinauraliser_getDiffuseEqMode(hBin) == DIFF_EQ_FABIAN_CTF) {
+            strcpy(pData->progressBarText, "Applying dummy head diffuse-field EQ");
+            strcpy(pData->progressBarTooltip, "Applying dummy head diffuse-field EQ");
+            pData->progressBar0_1 = 0.95f;
+            pData->N_samples_fabian_cir = 256;
+            pData->fabian_cir = realloc1d(pData->fabian_cir, pData->N_samples_fabian_cir * sizeof(float));
+            memcpy(pData->fabian_cir, &fabian_ir, pData->N_samples_fabian_cir);
+            pData->ctf_fb = (float_complex*)realloc1d((void**)pData->ctf_fb,HYBRID_BANDS * NUM_EARS * sizeof(double_complex));
 
-        if(pData->N_hrir_dirs<=3600){
-            pData->weights = realloc1d(pData->weights, pData->N_hrir_dirs*sizeof(float));
-            float * hrir_dirs_rad = (float*) malloc1d(pData->N_hrir_dirs*2*sizeof(float));
-            memcpy(hrir_dirs_rad, pData->hrir_dirs_deg, pData->N_hrir_dirs*2*sizeof(float));
-            cblas_sscal(pData->N_hrir_dirs*2, SAF_PI/180.f, hrir_dirs_rad, 1);
-            sphElev2incl(hrir_dirs_rad, pData->N_hrir_dirs, 0, hrir_dirs_rad);
-            //for (int i=0; i<pData->N_hrir_dirs; i++)
-            //    printf("%.3f, %.3f \n", hrir_dirs_rad[2*i], hrir_dirs_rad[2*i+1]);
-            int supOrder = calculateGridWeights(hrir_dirs_rad, pData->N_hrir_dirs, -1, pData->weights);
-            if(supOrder < 1){
-                if(pData->VBAP_3d_FLAG) {
-                    saf_print_warning("Could not calculate grid weights");
-                    free(pData->weights);
-                    pData->weights = NULL;
-                }
-                else {
-                    /* DEQ weight calculation for 2D BRIRs go brrr */
+            /* convert FABIAN dummy head cir to filter bank coefficients */
+            afAnalyse(pData->fabian_cir, pData->N_samples_fabian_cir, 1, HOP_SIZE, 0, 1, pData->ctf_fb);
+
+            /* perform equalisation */
+            for (int source = 0; source < pData->nSources; source++) {
+                for (int band = 0; band < HYBRID_BANDS; band++) {
+                    for (int nd = 0; pData->N_hrir_dirs; nd++) {
+                        pData->hrtf_fb[band * NUM_EARS * pData->N_hrir_dirs + 0 * pData->N_hrir_dirs + nd][source] = ccmul(
+                                pData->ctf_fb[band * pData->N_hrir_dirs + nd],
+                                pData->hrtf_fb[band * NUM_EARS * pData->N_hrir_dirs + 0 * pData->N_hrir_dirs + nd][source]);
+                        pData->hrtf_fb[band * NUM_EARS * pData->N_hrir_dirs + 1 * pData->N_hrir_dirs + nd][source] = ccmul(
+                                pData->ctf_fb[band * pData->N_hrir_dirs + nd],
+                                pData->hrtf_fb[band * NUM_EARS * pData->N_hrir_dirs + 1 * pData->N_hrir_dirs + nd][source]);
+                    }
                 }
             }
         }
-        else{
-            saf_print_warning("Too many grid points to calculate grid weights. i.e., we're not assuming that the HRTF measurement grid was uniform.");
-            free(pData->weights);
-            pData->weights = NULL;
-        }
-    for (int source = 0; source < pData->nSources; source++)
-        diffuseFieldEqualiseHRTFs(pData->N_hrir_dirs, pData->itds_s[source], pData->freqVector, HYBRID_BANDS, pData->weights, 1, 0, pData->hrtf_fb[source]);
-    }
 
+            /* equalise diffuse field with loaded BRIR data */
+        else if (roombinauraliser_getDiffuseEqMode(hBin) == DIFF_EQ_BRIR_CTF) {
+            strcpy(pData->progressBarText,"Applying BRIR diffuse-field EQ");
+            strcpy(pData->progressBarTooltip,"Applying BRIR diffuse-field EQ");
+            pData->progressBar0_1 = 0.95f;
+
+            if(pData->N_hrir_dirs<=3600){
+                pData->weights = realloc1d(pData->weights, pData->N_hrir_dirs*sizeof(float));
+                float* hrir_dirs_rad = (float*) malloc1d(pData->N_hrir_dirs*2*sizeof(float));
+                memcpy(hrir_dirs_rad, pData->hrir_dirs_deg, pData->N_hrir_dirs*2*sizeof(float));
+                cblas_sscal(pData->N_hrir_dirs*2, SAF_PI/180.f, hrir_dirs_rad, 1);
+                sphElev2incl(hrir_dirs_rad, pData->N_hrir_dirs, 0, hrir_dirs_rad);
+                //for (int i=0; i<pData->N_hrir_dirs; i++)
+                //    printf("%.3f, %.3f \n", hrir_dirs_rad[2*i], hrir_dirs_rad[2*i+1]);
+                int supOrder = calculateGridWeights(hrir_dirs_rad, pData->N_hrir_dirs, -1, pData->weights);
+                if(supOrder < 1){
+                    if(pData->VBAP_3d_FLAG) {
+                        saf_print_warning("Could not calculate grid weights");
+                        free(pData->weights);
+                        pData->weights = NULL;
+                    }
+                    else {
+                        /* DEQ weight calculation for 2D BRIRs go brrr */
+                    }
+                }
+            }
+            else{
+                saf_print_warning("Too many grid points to calculate grid weights. i.e., we're not assuming that the HRTF measurement grid was uniform.");
+                free(pData->weights);
+                pData->weights = NULL;
+            }
+            for (int source = 0; source < pData->nSources; source++)
+                diffuseFieldEqualiseHRTFs(pData->N_hrir_dirs, pData->itds_s[source], pData->freqVector, HYBRID_BANDS, pData->weights, 1, 0, (float_complex*)pData->hrtf_fb[source]);
+        }
+    }
     /* calculate magnitude responses */
     pData->hrtf_fb_mag = (float**)realloc2d((void**)pData->hrtf_fb_mag, pData->nSources, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs), sizeof(float));
     for (int source = 0; source < pData->nSources; source++)
