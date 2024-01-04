@@ -363,7 +363,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     pData->hrtf_fb = (float_complex**)realloc2d((void**)pData->hrtf_fb, pData->nSources, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs), sizeof(float_complex));
     for (int source = 0; source < pData->nSources; source++)
         HRIRs2HRTFs_afSTFT(pData->hrirs[source], pData->N_hrir_dirs, pData->hrir_runtime_len, HOP_SIZE, 0, 1, pData->hrtf_fb[source]);
-    
+
 
     /* HRIR pre-processing */
     if(pData->enableHRIRsDiffuseEQ){
@@ -371,7 +371,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
         strcpy(pData->progressBarText,"Applying BRIR diffuse-field EQ");
         strcpy(pData->progressBarTooltip,"Applying BRIR diffuse-field EQ");
         pData->progressBar0_1 = 0.95f;
-        
+
         if(pData->N_hrir_dirs<=3600){
             pData->weights = realloc1d(pData->weights, pData->N_hrir_dirs*sizeof(float));
             float * hrir_dirs_rad = (float*) malloc1d(pData->N_hrir_dirs*2*sizeof(float));

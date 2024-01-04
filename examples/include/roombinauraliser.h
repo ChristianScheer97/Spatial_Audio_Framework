@@ -64,6 +64,12 @@ typedef enum {
     REINIT_RESAMPLE,    /**< start re-initialization without loading sofa data */
     REINIT_DEQ          /**< only re-initialize diffuse-field equalization */
 }REINIT_MODES;
+
+typedef enum {
+    DIFF_EQ_FABIAN_CTF = 1, /**< Use pregenerated diffuse field equalization filter of the FABIAN dummy head (https://www.researchgate.net/publication/313650711_The_FABIAN_head-related_transfer_function_data_base) */
+    DIFF_EQ_BRIR_CTF, /**< Calculate diffuse field equalization filter from loaded BRIR data */
+    DIFF_EQ_OWN_FILTER /**< Use an own externalization filter loaded as a .sofa file */
+}DIFF_EQ_MODES;
 /* ========================================================================== */
 /*                               Main Functions                               */
 /* ========================================================================== */

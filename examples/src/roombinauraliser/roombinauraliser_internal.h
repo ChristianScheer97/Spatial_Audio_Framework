@@ -92,7 +92,12 @@ typedef struct _roombinauraliser
     int hrir_loaded_fs;              /**< sampling rate of the loaded HRIRs  */
     int hrir_runtime_fs;             /**< sampling rate of the HRIRs being used for processing (after any resampling) */
     float* weights;                  /**< Integration weights for the HRIR measurement grid */
-    
+
+    /* Diffuse field eq data */
+    float* fabian_cir;
+    float_complex* ctf_fb;         /**< hrtf filterbank coefficients; nBands x nCH x N_hrirs */
+    int N_samples_fabian_cir;
+
     /* vbap gain table */
     int hrtf_vbapTableRes[2];        /**< [0] azimuth, and [1] elevation grid resolution, in degrees */
     int N_hrtf_vbap_gtable;          /**< Number of interpolation weights/directions */
