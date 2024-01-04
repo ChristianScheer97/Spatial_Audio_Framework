@@ -376,21 +376,21 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             pData->N_samples_fabian_cir = 256;
             pData->fabian_cir = realloc1d(pData->fabian_cir, pData->N_samples_fabian_cir * sizeof(float));
             memcpy(pData->fabian_cir, &fabian_ir, pData->N_samples_fabian_cir);
-            pData->ctf_fb = (float_complex*)realloc1d((void**)pData->ctf_fb,HYBRID_BANDS * NUM_EARS * sizeof(double_complex));
+            pData->ctf_fb = (float_complex*)malloc1d(HYBRID_BANDS * NUM_EARS * sizeof(float_complex));
 
             /* convert FABIAN dummy head cir to filter bank coefficients */
             afAnalyse(pData->fabian_cir, pData->N_samples_fabian_cir, 1, HOP_SIZE, 0, 1, pData->ctf_fb);
 
             /* perform equalisation */
             for (int source = 0; source < pData->nSources; source++) {
-                for (int band = 0; band < HYBRID_BANDS; band++) {
-                    for (int nd = 0; pData->N_hrir_dirs; nd++) {
-                        pData->hrtf_fb[band * NUM_EARS * pData->N_hrir_dirs + 0 * pData->N_hrir_dirs + nd][source] = ccmul(
-                                pData->ctf_fb[band * pData->N_hrir_dirs + nd],
-                                pData->hrtf_fb[band * NUM_EARS * pData->N_hrir_dirs + 0 * pData->N_hrir_dirs + nd][source]);
-                        pData->hrtf_fb[band * NUM_EARS * pData->N_hrir_dirs + 1 * pData->N_hrir_dirs + nd][source] = ccmul(
-                                pData->ctf_fb[band * pData->N_hrir_dirs + nd],
-                                pData->hrtf_fb[band * NUM_EARS * pData->N_hrir_dirs + 1 * pData->N_hrir_dirs + nd][source]);
+                for (int nd = 0; nd < pData->N_hrir_dirs; nd++) {
+                    for (int band = 0; band < HYBRID_BANDS; band++) {
+                        pData->hrtf_fb[source][band * NUM_EARS * pData->N_hrir_dirs + 0 * pData->N_hrir_dirs + nd] = ccmul(
+                               pData->ctf_fb[band],
+                               pData->hrtf_fb[source][band * NUM_EARS * pData->N_hrir_dirs + 0 * pData->N_hrir_dirs + nd]);
+                        pData->hrtf_fb[source][band * NUM_EARS * pData->N_hrir_dirs + 1 * pData->N_hrir_dirs + nd] = ccmul(
+                               pData->ctf_fb[band],
+                               pData->hrtf_fb[source][band * NUM_EARS * pData->N_hrir_dirs + 1 * pData->N_hrir_dirs + nd]);
                     }
                 }
             }
