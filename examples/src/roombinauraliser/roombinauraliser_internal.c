@@ -364,40 +364,47 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     for (int source = 0; source < pData->nSources; source++)
         HRIRs2HRTFs_afSTFT(pData->hrirs[source], pData->N_hrir_dirs, pData->hrir_runtime_len, HOP_SIZE, 0, 1, pData->hrtf_fb[source]);
 
-
     /* HRIR pre-processing */
-/* Apply diffuse field equalisation */
+
+    /* Apply diffuse field equalisation */
     if (pData->enableHRIRsDiffuseEQ) {
+
         /* dummy head (FABIAN) diffuse field equalisation */
-        if (roombinauraliser_getDiffuseEqMode(hBin) == DIFF_EQ_FABIAN_CTF) {
+        if (pData->diffEqMode == DIFF_EQ_FABIAN_CTF) {
             strcpy(pData->progressBarText, "Applying dummy head diffuse-field EQ");
             strcpy(pData->progressBarTooltip, "Applying dummy head diffuse-field EQ");
             pData->progressBar0_1 = 0.95f;
             pData->N_samples_fabian_cir = 256;
+
             pData->fabian_cir = realloc1d(pData->fabian_cir, pData->N_samples_fabian_cir * sizeof(float));
-            memcpy(pData->fabian_cir, &fabian_ir, pData->N_samples_fabian_cir);
-            pData->ctf_fb = (float_complex*)malloc1d(HYBRID_BANDS * NUM_EARS * sizeof(float_complex));
+            memcpy(pData->fabian_cir, &fabian_ir, pData->N_samples_fabian_cir * sizeof(float));
+            pData->ctf_fb = (float_complex*)realloc1d(pData->ctf_fb , HYBRID_BANDS * sizeof(float_complex));
+
+            // print all CIR samples
+            for (int i = 0; i < pData->N_samples_fabian_cir; i++)
+                printf("CIR[%d] = %.3f\n", i, pData->fabian_cir[i]);
 
             /* convert FABIAN dummy head cir to filter bank coefficients */
-            afAnalyse(pData->fabian_cir, pData->N_samples_fabian_cir, 1, HOP_SIZE, 0, 1, pData->ctf_fb);
+            //afAnalyse(pData->fabian_cir, pData->N_samples_fabian_cir, 1, HOP_SIZE, 0, 1, pData->ctf_fb);
+            afSTFT_FIRtoFilterbankCoeffs((float*)pData->fabian_cir, 1, 1, pData->N_samples_fabian_cir, HOP_SIZE, 0, 1, pData->ctf_fb);
 
             /* perform equalisation */
-            for (int source = 0; source < pData->nSources; source++) {
-                for (int nd = 0; nd < pData->N_hrir_dirs; nd++) {
-                    for (int band = 0; band < HYBRID_BANDS; band++) {
-                        pData->hrtf_fb[source][band * NUM_EARS * pData->N_hrir_dirs + 0 * pData->N_hrir_dirs + nd] = ccmul(
-                               pData->ctf_fb[band],
-                               pData->hrtf_fb[source][band * NUM_EARS * pData->N_hrir_dirs + 0 * pData->N_hrir_dirs + nd]);
-                        pData->hrtf_fb[source][band * NUM_EARS * pData->N_hrir_dirs + 1 * pData->N_hrir_dirs + nd] = ccmul(
-                               pData->ctf_fb[band],
-                               pData->hrtf_fb[source][band * NUM_EARS * pData->N_hrir_dirs + 1 * pData->N_hrir_dirs + nd]);
-                    }
-                }
-            }
+            int source, band, ear, nd;
+            for (source = 0; source < pData->nSources; source++)
+                for (band = 0; band < HYBRID_BANDS; band++)
+                    for (ear = 0; ear < NUM_EARS; ear++ )
+                        for (nd = 0; nd < pData->N_hrir_dirs; nd++) {
+                            pData->hrtf_fb[source][band*NUM_EARS*pData->N_hrir_dirs + ear*pData->N_hrir_dirs + nd] = ccmulf(
+                                    pData->ctf_fb[band],
+                                    pData->hrtf_fb[source][band*NUM_EARS*pData->N_hrir_dirs + ear*pData->N_hrir_dirs + nd]); }
+
+            // print all HRTF coefficients of source 0 and direction 0 after equalisation for the right ear
+            for (int i = 0; i < HYBRID_BANDS; i++)
+                printf("HRTF[%d] = %.3f + %.3f i\n", i, crealf(pData->hrtf_fb[0][i*NUM_EARS*pData->N_hrir_dirs + 1]), cimagf(pData->hrtf_fb[0][i*NUM_EARS*pData->N_hrir_dirs + 1]));
         }
 
-            /* equalise diffuse field with loaded BRIR data */
-        else if (roombinauraliser_getDiffuseEqMode(hBin) == DIFF_EQ_BRIR_CTF) {
+        /* equalise diffuse field with loaded BRIR data */
+        else if (pData->diffEqMode == DIFF_EQ_BRIR_CTF) {
             strcpy(pData->progressBarText,"Applying BRIR diffuse-field EQ");
             strcpy(pData->progressBarTooltip,"Applying BRIR diffuse-field EQ");
             pData->progressBar0_1 = 0.95f;
@@ -419,6 +426,9 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
                     }
                     else {
                         /* DEQ weight calculation for 2D BRIRs go brrr */
+                        saf_print_warning("Could not calculate grid weights");
+                        free(pData->weights);
+                        pData->weights = NULL;
                     }
                 }
             }

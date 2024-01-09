@@ -80,6 +80,9 @@ void roombinauraliser_create
     //pData->hrtf_fb_default = NULL;
     pData->hrtf_fb_mag = NULL;
     //pData->hrtf_fb_mag_default = NULL;
+    pData->ctf_fb = NULL;
+    pData->fabian_cir = NULL;
+
 
     /* flags/status */
     pData->progressBar0_1 = 0.0f;
