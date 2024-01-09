@@ -380,12 +380,7 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
             memcpy(pData->fabian_cir, &fabian_ir, pData->N_samples_fabian_cir * sizeof(float));
             pData->ctf_fb = (float_complex*)realloc1d(pData->ctf_fb , HYBRID_BANDS * sizeof(float_complex));
 
-            // print all CIR samples
-            for (int i = 0; i < pData->N_samples_fabian_cir; i++)
-                printf("CIR[%d] = %.3f\n", i, pData->fabian_cir[i]);
-
             /* convert FABIAN dummy head cir to filter bank coefficients */
-            //afAnalyse(pData->fabian_cir, pData->N_samples_fabian_cir, 1, HOP_SIZE, 0, 1, pData->ctf_fb);
             afSTFT_FIRtoFilterbankCoeffs((float*)pData->fabian_cir, 1, 1, pData->N_samples_fabian_cir, HOP_SIZE, 0, 1, pData->ctf_fb);
 
             /* perform equalisation */
@@ -398,9 +393,6 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
                                     pData->ctf_fb[band],
                                     pData->hrtf_fb[source][band*NUM_EARS*pData->N_hrir_dirs + ear*pData->N_hrir_dirs + nd]); }
 
-            // print all HRTF coefficients of source 0 and direction 0 after equalisation for the right ear
-            for (int i = 0; i < HYBRID_BANDS; i++)
-                printf("HRTF[%d] = %.3f + %.3f i\n", i, crealf(pData->hrtf_fb[0][i*NUM_EARS*pData->N_hrir_dirs + 1]), cimagf(pData->hrtf_fb[0][i*NUM_EARS*pData->N_hrir_dirs + 1]));
         }
 
         /* equalise diffuse field with loaded BRIR data */
