@@ -61,6 +61,12 @@ void roombinauraliser_create
     pData->inputframeTF = (float_complex***)malloc3d(HYBRID_BANDS, MAX_NUM_INPUTS, TIME_SLOTS, sizeof(float_complex));
     pData->outputframeTF = (float_complex***)malloc3d(HYBRID_BANDS, NUM_EARS, TIME_SLOTS, sizeof(float_complex));
     
+    /* Partitioned Convolution */
+    pData->hPart_current_left = NULL;
+    pData->hPart_current_right = NULL;
+    pData->hPart_new_left = NULL;
+    pData->hPart_new_right = NULL;
+    
     /* hrir data */
     pData->hrirs = NULL;
     pData->hrir_dirs_deg = NULL;
@@ -213,7 +219,7 @@ void roombinauraliser_process
     enableRotation = pData->enableRotation;
     
     /* apply binaural panner */
-    if ((nSamples == roombinauraliser_FRAME_SIZE) && (pData->hrtf_fb!=NULL) && (pData->codecStatus==CODEC_STATUS_INITIALISED) ) {
+    if ((nSamples == roombinauraliser_FRAME_SIZE) && (pData->codecStatus==CODEC_STATUS_INITIALISED) ) {
         pData->procStatus = PROC_STATUS_ONGOING;
 
         /* Load time-domain data */
@@ -228,8 +234,6 @@ void roombinauraliser_process
                 utility_svsmul(pData->inputFrameTD[ch], &(pData->src_gains[ch]), roombinauraliser_FRAME_SIZE, NULL); 
         }
 
-        /* Apply time-frequency transform (TFT) to all input and brir data */
-        afSTFT_forward_knownDimensions(pData->hSTFT, pData->inputFrameTD, roombinauraliser_FRAME_SIZE, MAX_NUM_INPUTS, TIME_SLOTS, pData->inputframeTF);
 
         /* Rotate source directions */
         if(enableRotation && pData->recalc_M_rotFLAG){
@@ -250,9 +254,10 @@ void roombinauraliser_process
             pData->recalc_M_rotFLAG = 0;
         }
 
-        /* interpolate hrtfs and apply to each source */
-        memset(FLATTEN3D(pData->outputframeTF), 0, HYBRID_BANDS*NUM_EARS*TIME_SLOTS * sizeof(float_complex));
+        /* Apply time-frequency transform (TFT) to all input and brir data */
+        //afSTFT_forward_knownDimensions(pData->hSTFT, pData->inputFrameTD, roombinauraliser_FRAME_SIZE, MAX_NUM_INPUTS, TIME_SLOTS, pData->inputframeTF);
         
+        /*
         if(pData->recalc_hrtf_interpFLAG){
             if(enableRotation)
                 roombinauraliser_interpHRTFs(hBin, pData->interpMode, pData->rot_deg[0], pData->rot_deg[1], pData->hrtf_interp);
@@ -260,19 +265,14 @@ void roombinauraliser_process
                 roombinauraliser_interpHRTFs(hBin, pData->interpMode, 0, 0, pData->hrtf_interp);
             pData->recalc_hrtf_interpFLAG = 0;
         }
+        */
         
-        for (ch = 0; ch < nSources; ch++) {
-            /* Convolve this channel with the interpolated HRTF, and add it to the binaural buffer */
-            for (band = 0; band < HYBRID_BANDS; band++)
-                for (ear = 0; ear < NUM_EARS; ear++)
-                    cblas_caxpy(TIME_SLOTS, &pData->hrtf_interp[ch][band][ear], pData->inputframeTF[band][ch], 1, pData->outputframeTF[band][ear], 1);
-        }
+        /* Convolve this channel with the interpolated HRTF, and add it to the binaural buffer */
+    
+        conv_process(pData->hPart_current_left, pData->inputFrameTD[0], HOP_SIZE, hBin);
+        //conv_process(pData->hPart_current_right, pData->inputFrameTD[1], HOP_SIZE, hBin);
 
-        /* scale by number of sources */
-        cblas_sscal(/*re+im*/2*HYBRID_BANDS*NUM_EARS*TIME_SLOTS, 1.0f/sqrtf((float)nSources), (float*)FLATTEN3D(pData->outputframeTF), 1);
-
-        /* inverse-TFT */
-        afSTFT_backward_knownDimensions(pData->hSTFT, pData->outputframeTF, roombinauraliser_FRAME_SIZE, NUM_EARS, TIME_SLOTS, pData->outframeTD);
+       
 
         /* Copy to output buffer */
         for (ch = 0; ch < SAF_MIN(NUM_EARS, nOutputs); ch++)

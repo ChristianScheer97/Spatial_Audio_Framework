@@ -31,6 +31,7 @@
  */
 
 #include "roombinauraliser_internal.h"
+#include <stdio.h>
 
 void roombinauraliser_setCodecStatus(void* const hBin, CODEC_STATUS newStatus)
 {
@@ -360,87 +361,41 @@ void roombinauraliser_initHRTFsAndGainTables(void* const hBin)
     
     /* convert hrirs to filterbank coefficients */
     pData->progressBar0_1 = 0.85f;
-    pData->hrtf_fb = (float_complex**)realloc2d((void**)pData->hrtf_fb, pData->nSources, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs), sizeof(float_complex));
+    /*pData->hrtf_fb = (float_complex**)realloc2d((void**)pData->hrtf_fb, pData->nSources, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs), sizeof(float_complex));
     for (int source = 0; source < pData->nSources; source++)
         HRIRs2HRTFs_afSTFT(pData->hrirs[source], pData->N_hrir_dirs, pData->hrir_runtime_len, HOP_SIZE, 0, 1, pData->hrtf_fb[source]);
-
+     */
+    
+    
+    
     /* HRIR pre-processing */
 
-    /* Apply diffuse field equalisation */
-    if (pData->enableHRIRsDiffuseEQ) {
+    pData->hPart_current_left = conv_new_optimum_partitioning(pData->hrirs[0], pData->hrir_loaded_len, LATENCY, roombinauraliser_convoutput, hBin, pData->hPart_current_left);
+    conv_new_optimum_partitioning(pData->hrirs[0], pData->hrir_loaded_len, LATENCY, roombinauraliser_convoutput, hBin, pData->hPart_current_right);
+    conv_new_optimum_partitioning(pData->hrirs[0], pData->hrir_loaded_len, LATENCY, roombinauraliser_convoutput, hBin, pData->hPart_new_left);
+    conv_new_optimum_partitioning(pData->hrirs[0], pData->hrir_loaded_len, LATENCY, roombinauraliser_convoutput, hBin, pData->hPart_new_right);
 
-        /* dummy head (FABIAN) diffuse field equalisation */
-        if (pData->diffEqMode == DIFF_EQ_FABIAN_CTF) {
-            strcpy(pData->progressBarText, "Applying dummy head diffuse-field EQ");
-            strcpy(pData->progressBarTooltip, "Applying dummy head diffuse-field EQ");
-            pData->progressBar0_1 = 0.95f;
-            pData->N_samples_fabian_cir = 256;
-
-            pData->fabian_cir = realloc1d(pData->fabian_cir, pData->N_samples_fabian_cir * sizeof(float));
-            memcpy(pData->fabian_cir, &fabian_ir, pData->N_samples_fabian_cir * sizeof(float));
-            pData->ctf_fb = (float_complex*)realloc1d(pData->ctf_fb , HYBRID_BANDS * sizeof(float_complex));
-
-            /* convert FABIAN dummy head cir to filter bank coefficients */
-            afSTFT_FIRtoFilterbankCoeffs((float*)pData->fabian_cir, 1, 1, pData->N_samples_fabian_cir, HOP_SIZE, 0, 1, pData->ctf_fb);
-
-            /* perform equalisation */
-            int source, band, ear, nd;
-            for (source = 0; source < pData->nSources; source++)
-                for (band = 0; band < HYBRID_BANDS; band++)
-                    for (ear = 0; ear < NUM_EARS; ear++ )
-                        for (nd = 0; nd < pData->N_hrir_dirs; nd++) {
-                            pData->hrtf_fb[source][band*NUM_EARS*pData->N_hrir_dirs + ear*pData->N_hrir_dirs + nd] = ccmulf(
-                                    pData->ctf_fb[band],
-                                    pData->hrtf_fb[source][band*NUM_EARS*pData->N_hrir_dirs + ear*pData->N_hrir_dirs + nd]); }
-
-        }
-
-        /* equalise diffuse field with loaded BRIR data */
-        else if (pData->diffEqMode == DIFF_EQ_BRIR_CTF) {
-            strcpy(pData->progressBarText,"Applying BRIR diffuse-field EQ");
-            strcpy(pData->progressBarTooltip,"Applying BRIR diffuse-field EQ");
-            pData->progressBar0_1 = 0.95f;
-
-            if(pData->N_hrir_dirs<=3600){
-                pData->weights = realloc1d(pData->weights, pData->N_hrir_dirs*sizeof(float));
-                float* hrir_dirs_rad = (float*) malloc1d(pData->N_hrir_dirs*2*sizeof(float));
-                memcpy(hrir_dirs_rad, pData->hrir_dirs_deg, pData->N_hrir_dirs*2*sizeof(float));
-                cblas_sscal(pData->N_hrir_dirs*2, SAF_PI/180.f, hrir_dirs_rad, 1);
-                sphElev2incl(hrir_dirs_rad, pData->N_hrir_dirs, 0, hrir_dirs_rad);
-                //for (int i=0; i<pData->N_hrir_dirs; i++)
-                //    printf("%.3f, %.3f \n", hrir_dirs_rad[2*i], hrir_dirs_rad[2*i+1]);
-                int supOrder = calculateGridWeights(hrir_dirs_rad, pData->N_hrir_dirs, -1, pData->weights);
-                if(supOrder < 1){
-                    if(pData->VBAP_3d_FLAG) {
-                        saf_print_warning("Could not calculate grid weights");
-                        free(pData->weights);
-                        pData->weights = NULL;
-                    }
-                    else {
-                        /* DEQ weight calculation for 2D BRIRs go brrr */
-                        saf_print_warning("Could not calculate grid weights");
-                        free(pData->weights);
-                        pData->weights = NULL;
-                    }
-                }
-            }
-            else{
-                saf_print_warning("Too many grid points to calculate grid weights. i.e., we're not assuming that the HRTF measurement grid was uniform.");
-                free(pData->weights);
-                pData->weights = NULL;
-            }
-            for (int source = 0; source < pData->nSources; source++)
-                diffuseFieldEqualiseHRTFs(pData->N_hrir_dirs, pData->itds_s[source], pData->freqVector, HYBRID_BANDS, pData->weights, 1, 0, (float_complex*)pData->hrtf_fb[source]);
-        }
-    }
-    /* calculate magnitude responses */
-    pData->hrtf_fb_mag = (float**)realloc2d((void**)pData->hrtf_fb_mag, pData->nSources, HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs), sizeof(float));
-    for (int source = 0; source < pData->nSources; source++)
-        for (int i = 0; i < HYBRID_BANDS * NUM_EARS * (pData->N_hrir_dirs); i++)
-            pData->hrtf_fb_mag[source][i] = cabsf(pData->hrtf_fb[source][i]);
     
     /* The HRTFs should be re-interpolated */
     pData->recalc_hrtf_interpFLAG = 1;
+}
+
+void roombinauraliser_convoutput
+(
+    void* SELF,
+    dft_sample_t* output,
+    int num_samples,
+    void* const hBin
+)
+{
+    roombinauraliser_data *pData = (roombinauraliser_data*)(hBin);
+    int ch;
+    for (ch = 0; ch < NUM_EARS; ch++)
+        utility_svvcopy(output, num_samples, pData->outframeTD[ch]);
+    
+    for (int i=0; i<HOP_SIZE; i++) {
+        printf("%f \n", output[i]);
+    }
 }
 
 void roombinauraliser_initTFT

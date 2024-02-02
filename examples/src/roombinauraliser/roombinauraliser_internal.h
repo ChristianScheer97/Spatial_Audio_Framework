@@ -36,7 +36,8 @@
 #include "roombinauraliser.h"  /* Include header for this example */
 #include "saf.h"           /* Main include header for SAF */
 #include "saf_externals.h" /* To also include SAF dependencies (cblas etc.) */
-#include "netcdf.h"        /* Include NetCDF*/
+#include "netcdf.h"        /* Include NetCDF */
+#include "../../../../Partitioned-Convolution/lib/Convolution.h"   /* Include Partitioned Convolution */
 #include "../../../framework/resources/afSTFT/afSTFTlib.h"
 //#include " ../../../modules/saf_sofa_reader/libmysofa/internal/mysofa_internal.h"
 #ifdef __cplusplus
@@ -57,6 +58,7 @@ extern "C" {
 #define HOP_SIZE ( 128 )                                  /**< STFT hop size */
 #define HYBRID_BANDS ( HOP_SIZE + 5 )                     /**< Number of frequency bands */
 #define TIME_SLOTS ( roombinauraliser_FRAME_SIZE / HOP_SIZE ) /**< Number of STFT timeslots */
+#define LATENCY 256
 
 /* Checks: */
 #if (roombinauraliser_FRAME_SIZE % HOP_SIZE != 0)
@@ -82,6 +84,13 @@ typedef struct _roombinauraliser
     int fs;                          /**< Host sampling rate, in Hz */
     float freqVector[HYBRID_BANDS];  /**< Frequency vector (filterbank centre frequencies) */
     void* hSTFT;                     /**< afSTFT handle */
+    
+    /* partitioned convolution */
+    
+    Convolution* hPart_current_left;
+    Convolution* hPart_current_right;
+    Convolution* hPart_new_left;
+    Convolution* hPart_new_right;    /**< partitioned convolution handles (2x2) for each ear and to be able to seamlessly crossfade between new and old audio */
     
     /* sofa file info */
     char* sofa_filepath;             /**< absolute/relevative file path for a sofa file */
@@ -182,6 +191,14 @@ void roombinauraliser_interpHRTFs(void* const hBin,
  * @note Call roombinauraliser_initTFT() (if needed) before calling this function
  */
 void roombinauraliser_initHRTFsAndGainTables(void* const hBin);
+
+/**
+ * outputs the processed audio from partitioned convolution into output buffer
+ *
+ *
+ */
+void roombinauraliser_convoutput(void* SELF, dft_sample_t* output, int num_samples, void* const hBin);
+
 
 /**
  * Initialise the filterbank used by roombinauraliser.
